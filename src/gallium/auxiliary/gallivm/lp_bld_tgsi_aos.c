@@ -98,27 +98,15 @@ swizzle_scalar_aos(struct lp_build_tgsi_aos_context *bld,
    return lp_build_swizzle_scalar_aos(&bld->base, a, chan);
 }
 
-
-/**
- * Register fetch.
- */
 static LLVMValueRef
-emit_fetch(
+emit_fetch_switch_file(
    struct lp_build_tgsi_aos_context *bld,
-   const struct tgsi_full_instruction *inst,
-   unsigned src_op)
+   const struct tgsi_full_src_register *reg)
 {
    LLVMBuilderRef builder = bld->base.gallivm->builder;
    struct lp_type type = bld->base.type;
-   const struct tgsi_full_src_register *reg = &inst->Src[src_op];
    LLVMValueRef res;
    unsigned chan;
-
-   assert(!reg->Register.Indirect);
-
-   /*
-    * Fetch the from the register file.
-    */
 
    switch (reg->Register.File) {
    case TGSI_FILE_CONSTANT:
@@ -200,6 +188,29 @@ emit_fetch(
       assert(0 && "invalid src register in emit_fetch()");
       return bld->base.undef;
    }
+
+   return res;
+
+}
+
+/**
+ * Register fetch.
+ */
+static LLVMValueRef
+emit_fetch(
+   struct lp_build_tgsi_aos_context *bld,
+   const struct tgsi_full_instruction *inst,
+   unsigned src_op)
+{
+   LLVMValueRef res;
+   const struct tgsi_full_src_register *reg = &inst->Src[src_op];
+
+   assert(!reg->Register.Indirect);
+
+   /*
+    * Fetch the from the register file.
+    */
+   res = bld->emit_fetch_switch_file_fn(bld, reg);
 
    /*
     * Apply sign modifier.
@@ -1025,6 +1036,7 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
    bld.consts_ptr = consts_ptr;
    bld.sampler = sampler;
    bld.indirect_files = info->indirect_files;
+   bld.emit_fetch_switch_file_fn = emit_fetch_switch_file;
    bld.instructions = (struct tgsi_full_instruction *)
                       MALLOC(LP_MAX_INSTRUCTIONS * sizeof(struct tgsi_full_instruction));
    bld.max_instructions = LP_MAX_INSTRUCTIONS;

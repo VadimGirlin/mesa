@@ -43,6 +43,7 @@
 #include "tgsi/tgsi_scan.h"
 
 
+struct tgsi_full_src_register;
 struct tgsi_token;
 struct tgsi_shader_info;
 struct lp_build_mask_context;
@@ -246,6 +247,9 @@ struct lp_build_tgsi_aos_context
 
    struct tgsi_full_instruction *instructions;
    uint max_instructions;
+
+   LLVMValueRef (*emit_fetch_switch_file_fn)(struct lp_build_tgsi_aos_context *,
+                                         const struct tgsi_full_src_register *);
 };
 
 
