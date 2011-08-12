@@ -55,53 +55,10 @@
 #include "lp_bld_flow.h"
 #include "lp_bld_quad.h"
 #include "lp_bld_tgsi.h"
-#include "lp_bld_limits.h"
 #include "lp_bld_debug.h"
 
 
 #define LP_MAX_INSTRUCTIONS 256
-
-
-struct lp_build_tgsi_aos_context
-{
-   struct lp_build_context base;
-
-   /* Builder for integer masks and indices */
-   struct lp_build_context int_bld;
-
-   /*
-    * AoS swizzle used:
-    * - swizzles[0] = red index
-    * - swizzles[1] = green index
-    * - swizzles[2] = blue index
-    * - swizzles[3] = alpha index
-    */
-   unsigned char swizzles[4];
-   unsigned char inv_swizzles[4];
-
-   LLVMValueRef consts_ptr;
-   const LLVMValueRef *inputs;
-   LLVMValueRef *outputs;
-
-   struct lp_build_sampler_aos *sampler;
-
-   LLVMValueRef immediates[LP_MAX_TGSI_IMMEDIATES];
-   LLVMValueRef temps[LP_MAX_TGSI_TEMPS];
-   LLVMValueRef addr[LP_MAX_TGSI_ADDRS];
-   LLVMValueRef preds[LP_MAX_TGSI_PREDS];
-
-   /* We allocate/use this array of temps if (1 << TGSI_FILE_TEMPORARY) is
-    * set in the indirect_files field.
-    * The temps[] array above is unused then.
-    */
-   LLVMValueRef temps_array;
-
-   /** bitmask indicating which register files are accessed indirectly */
-   unsigned indirect_files;
-
-   struct tgsi_full_instruction *instructions;
-   uint max_instructions;
-};
 
 
 /**

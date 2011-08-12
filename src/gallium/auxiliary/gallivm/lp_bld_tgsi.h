@@ -36,6 +36,8 @@
 #define LP_BLD_TGSI_H
 
 #include "gallivm/lp_bld.h"
+#include "gallivm/lp_bld_limits.h"
+#include "lp_bld_type.h"
 #include "pipe/p_compiler.h"
 #include "pipe/p_state.h"
 #include "tgsi/tgsi_scan.h"
@@ -43,8 +45,6 @@
 
 struct tgsi_token;
 struct tgsi_shader_info;
-struct lp_type;
-struct lp_build_context;
 struct lp_build_mask_context;
 struct gallivm_state;
 
@@ -205,6 +205,48 @@ lp_build_system_values_array(struct gallivm_state *gallivm,
                              const struct tgsi_shader_info *info,
                              LLVMValueRef instance_id,
                              LLVMValueRef facing);
+
+
+struct lp_build_tgsi_aos_context
+{
+   struct lp_build_context base;
+
+   /* Builder for integer masks and indices */
+   struct lp_build_context int_bld;
+
+   /*
+    * AoS swizzle used:
+    * - swizzles[0] = red index
+    * - swizzles[1] = green index
+    * - swizzles[2] = blue index
+    * - swizzles[3] = alpha index
+    */
+   unsigned char swizzles[4];
+   unsigned char inv_swizzles[4];
+
+   LLVMValueRef consts_ptr;
+   const LLVMValueRef *inputs;
+   LLVMValueRef *outputs;
+
+   struct lp_build_sampler_aos *sampler;
+
+   LLVMValueRef immediates[LP_MAX_TGSI_IMMEDIATES];
+   LLVMValueRef temps[LP_MAX_TGSI_TEMPS];
+   LLVMValueRef addr[LP_MAX_TGSI_ADDRS];
+   LLVMValueRef preds[LP_MAX_TGSI_PREDS];
+
+   /* We allocate/use this array of temps if (1 << TGSI_FILE_TEMPORARY) is
+    * set in the indirect_files field.
+    * The temps[] array above is unused then.
+    */
+   LLVMValueRef temps_array;
+
+   /** bitmask indicating which register files are accessed indirectly */
+   unsigned indirect_files;
+
+   struct tgsi_full_instruction *instructions;
+   uint max_instructions;
+};
 
 
 #endif /* LP_BLD_TGSI_H */
