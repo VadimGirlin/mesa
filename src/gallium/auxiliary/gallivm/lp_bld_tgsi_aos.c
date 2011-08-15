@@ -196,8 +196,8 @@ emit_fetch_switch_file(
 /**
  * Register fetch.
  */
-static LLVMValueRef
-emit_fetch(
+LLVMValueRef
+lp_emit_fetch_aos(
    struct lp_build_tgsi_aos_context *bld,
    const struct tgsi_full_instruction *inst,
    unsigned src_op)
@@ -241,8 +241,8 @@ emit_fetch(
 /**
  * Register store.
  */
-static void
-emit_store(
+void
+lp_emit_store_aos(
    struct lp_build_tgsi_aos_context *bld,
    const struct tgsi_full_instruction *inst,
    unsigned index,
@@ -303,6 +303,8 @@ emit_store(
       return;
    }
 
+   if (!ptr)
+      return;
    /*
     * Predicate
     */
@@ -392,11 +394,11 @@ emit_tex(struct lp_build_tgsi_aos_context *bld,
 
    target = inst->Texture.Texture;
 
-   coords = emit_fetch( bld, inst, 0 );
+   coords = lp_emit_fetch_aos( bld, inst, 0 );
 
    if (modifier == LP_BLD_TEX_MODIFIER_EXPLICIT_DERIV) {
-      ddx = emit_fetch( bld, inst, 1 );
-      ddy = emit_fetch( bld, inst, 2 );
+      ddx = lp_emit_fetch_aos( bld, inst, 1 );
+      ddy = lp_emit_fetch_aos( bld, inst, 2 );
       unit = inst->Src[3].Register.Index;
    }  else {
 #if 0
@@ -418,8 +420,8 @@ emit_tex(struct lp_build_tgsi_aos_context *bld,
 }
 
 
-static void
-emit_declaration(
+void
+lp_emit_declaration_aos(
    struct lp_build_tgsi_aos_context *bld,
    const struct tgsi_full_declaration *decl)
 {
@@ -469,8 +471,8 @@ emit_declaration(
  * Emit LLVM for one TGSI instruction.
  * \param return TRUE for success, FALSE otherwise
  */
-static boolean
-emit_instruction(
+boolean
+lp_emit_instruction_aos(
    struct lp_build_tgsi_aos_context *bld,
    const struct tgsi_full_instruction *inst,
    const struct tgsi_opcode_info *info,
@@ -500,12 +502,12 @@ emit_instruction(
 
    switch (inst->Instruction.Opcode) {
    case TGSI_OPCODE_ARL:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       dst0 = lp_build_floor(&bld->base, src0);
       break;
 
    case TGSI_OPCODE_MOV:
-      dst0 = emit_fetch(bld, inst, 0);
+      dst0 = lp_emit_fetch_aos(bld, inst, 0);
       break;
 
    case TGSI_OPCODE_LIT:
@@ -513,13 +515,13 @@ emit_instruction(
 
    case TGSI_OPCODE_RCP:
    /* TGSI_OPCODE_RECIP */
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       dst0 = lp_build_rcp(&bld->base, src0);
       break;
 
    case TGSI_OPCODE_RSQ:
    /* TGSI_OPCODE_RECIPSQRT */
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       tmp0 = lp_build_abs(&bld->base, src0);
       dst0 = lp_build_rsqrt(&bld->base, tmp0);
       break;
@@ -531,14 +533,14 @@ emit_instruction(
       return FALSE;
 
    case TGSI_OPCODE_MUL:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       dst0 = lp_build_mul(&bld->base, src0, src1);
       break;
 
    case TGSI_OPCODE_ADD:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       dst0 = lp_build_add(&bld->base, src0, src1);
       break;
 
@@ -554,61 +556,61 @@ emit_instruction(
       return FALSE;
 
    case TGSI_OPCODE_MIN:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       dst0 = lp_build_max(&bld->base, src0, src1);
       break;
 
    case TGSI_OPCODE_MAX:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       dst0 = lp_build_max(&bld->base, src0, src1);
       break;
 
    case TGSI_OPCODE_SLT:
    /* TGSI_OPCODE_SETLT */
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_LESS, src0, src1);
       dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
 
    case TGSI_OPCODE_SGE:
    /* TGSI_OPCODE_SETGE */
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_GEQUAL, src0, src1);
       dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
 
    case TGSI_OPCODE_MAD:
    /* TGSI_OPCODE_MADD */
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
-      src2 = emit_fetch(bld, inst, 2);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
+      src2 = lp_emit_fetch_aos(bld, inst, 2);
       tmp0 = lp_build_mul(&bld->base, src0, src1);
       dst0 = lp_build_add(&bld->base, tmp0, src2);
       break;
 
    case TGSI_OPCODE_SUB:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       dst0 = lp_build_sub(&bld->base, src0, src1);
       break;
 
    case TGSI_OPCODE_LRP:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
-      src2 = emit_fetch(bld, inst, 2);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
+      src2 = lp_emit_fetch_aos(bld, inst, 2);
       tmp0 = lp_build_sub(&bld->base, src1, src2);
       tmp0 = lp_build_mul(&bld->base, src0, tmp0);
       dst0 = lp_build_add(&bld->base, tmp0, src2);
       break;
 
    case TGSI_OPCODE_CND:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
-      src2 = emit_fetch(bld, inst, 2);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
+      src2 = lp_emit_fetch_aos(bld, inst, 2);
       tmp1 = lp_build_const_vec(bld->base.gallivm, bld->base.type, 0.5);
       tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_GREATER, src2, tmp1);
       dst0 = lp_build_select(&bld->base, tmp0, src0, src1);
@@ -618,45 +620,45 @@ emit_instruction(
       return FALSE;
 
    case TGSI_OPCODE_FRC:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       tmp0 = lp_build_floor(&bld->base, src0);
       dst0 = lp_build_sub(&bld->base, src0, tmp0);
       break;
 
    case TGSI_OPCODE_CLAMP:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
-      src2 = emit_fetch(bld, inst, 2);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
+      src2 = lp_emit_fetch_aos(bld, inst, 2);
       tmp0 = lp_build_max(&bld->base, src0, src1);
       dst0 = lp_build_min(&bld->base, tmp0, src2);
       break;
 
    case TGSI_OPCODE_FLR:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       dst0 = lp_build_floor(&bld->base, src0);
       break;
 
    case TGSI_OPCODE_ROUND:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       dst0 = lp_build_round(&bld->base, src0);
       break;
 
    case TGSI_OPCODE_EX2:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       tmp0 = lp_build_swizzle_scalar_aos(&bld->base, src0, TGSI_SWIZZLE_X);
       dst0 = lp_build_exp2(&bld->base, tmp0);
       break;
 
    case TGSI_OPCODE_LG2:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       tmp0 = swizzle_scalar_aos(bld, src0, TGSI_SWIZZLE_X);
       dst0 = lp_build_log2(&bld->base, tmp0);
       break;
 
    case TGSI_OPCODE_POW:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       src0 = swizzle_scalar_aos(bld, src0, TGSI_SWIZZLE_X);
-      src1 = emit_fetch(bld, inst, 1);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       src1 = swizzle_scalar_aos(bld, src1, TGSI_SWIZZLE_X);
       dst0 = lp_build_pow(&bld->base, src0, src1);
       break;
@@ -665,7 +667,7 @@ emit_instruction(
       return FALSE;
 
    case TGSI_OPCODE_ABS:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       dst0 = lp_build_abs(&bld->base, src0);
       break;
 
@@ -678,7 +680,7 @@ emit_instruction(
       return FALSE;
 
    case TGSI_OPCODE_COS:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       tmp0 = swizzle_scalar_aos(bld, src0, TGSI_SWIZZLE_X);
       dst0 = lp_build_cos(&bld->base, tmp0);
       break;
@@ -716,8 +718,8 @@ emit_instruction(
       return FALSE;
 
    case TGSI_OPCODE_SEQ:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_EQUAL, src0, src1);
       dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
@@ -727,28 +729,28 @@ emit_instruction(
       break;
 
    case TGSI_OPCODE_SGT:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_GREATER, src0, src1);
       dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
 
    case TGSI_OPCODE_SIN:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       tmp0 = swizzle_scalar_aos(bld, src0, TGSI_SWIZZLE_X);
       dst0 = lp_build_sin(&bld->base, tmp0);
       break;
 
    case TGSI_OPCODE_SLE:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_LEQUAL, src0, src1);
       dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
 
    case TGSI_OPCODE_SNE:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
       tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_NOTEQUAL, src0, src1);
       dst0 = lp_build_select(&bld->base, tmp0, bld->base.one, bld->base.zero);
       break;
@@ -802,7 +804,7 @@ emit_instruction(
       break;
 
    case TGSI_OPCODE_ARR:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       dst0 = lp_build_round(&bld->base, src0);
       break;
 
@@ -824,14 +826,14 @@ emit_instruction(
 
    case TGSI_OPCODE_SSG:
    /* TGSI_OPCODE_SGN */
-      tmp0 = emit_fetch(bld, inst, 0);
+      tmp0 = lp_emit_fetch_aos(bld, inst, 0);
       dst0 = lp_build_sgn(&bld->base, tmp0);
       break;
 
    case TGSI_OPCODE_CMP:
-      src0 = emit_fetch(bld, inst, 0);
-      src1 = emit_fetch(bld, inst, 1);
-      src2 = emit_fetch(bld, inst, 2);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
+      src1 = lp_emit_fetch_aos(bld, inst, 1);
+      src2 = lp_emit_fetch_aos(bld, inst, 2);
       tmp0 = lp_build_cmp(&bld->base, PIPE_FUNC_LESS, src0, bld->base.zero);
       dst0 = lp_build_select(&bld->base, tmp0, src1, src2);
       break;
@@ -902,7 +904,7 @@ emit_instruction(
       break;
 
    case TGSI_OPCODE_CEIL:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       dst0 = lp_build_ceil(&bld->base, src0);
       break;
 
@@ -919,7 +921,7 @@ emit_instruction(
       break;
 
    case TGSI_OPCODE_TRUNC:
-      src0 = emit_fetch(bld, inst, 0);
+      src0 = lp_emit_fetch_aos(bld, inst, 0);
       dst0 = lp_build_trunc(&bld->base, src0);
       break;
 
@@ -996,7 +998,7 @@ emit_instruction(
    }
    
    if (info->num_dst) {
-      emit_store(bld, inst, 0, dst0);
+      lp_emit_store_aos(bld, inst, 0, dst0);
    }
 
    return TRUE;
@@ -1053,7 +1055,7 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
       switch(parse.FullToken.Token.Type) {
       case TGSI_TOKEN_TYPE_DECLARATION:
          /* Inputs already interpolated */
-         emit_declaration(&bld, &parse.FullToken.FullDeclaration);
+         lp_emit_declaration_aos(&bld, &parse.FullToken.FullDeclaration);
          break;
 
       case TGSI_TOKEN_TYPE_INSTRUCTION:
@@ -1116,7 +1118,7 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
       struct tgsi_full_instruction *instr = bld.instructions + pc;
       const struct tgsi_opcode_info *opcode_info =
          tgsi_get_opcode_info(instr->Instruction.Opcode);
-      if (!emit_instruction(&bld, instr, opcode_info, &pc))
+      if (!lp_emit_instruction_aos(&bld, instr, opcode_info, &pc))
          _debug_printf("warning: failed to translate tgsi opcode %s to LLVM\n",
                        opcode_info->mnemonic);
    }

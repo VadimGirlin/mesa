@@ -43,7 +43,10 @@
 #include "tgsi/tgsi_scan.h"
 
 
+struct tgsi_full_declaration;
+struct tgsi_full_instruction;
 struct tgsi_full_src_register;
+struct tgsi_opcode_info;
 struct tgsi_token;
 struct tgsi_shader_info;
 struct lp_build_mask_context;
@@ -255,6 +258,35 @@ struct lp_build_tgsi_aos_context
    LLVMValueRef (*emit_fetch_switch_file_fn)(struct lp_build_tgsi_aos_context *,
                                          const struct tgsi_full_src_register *);
 };
+
+
+void
+lp_emit_declaration_aos(
+   struct lp_build_tgsi_aos_context *bld,
+   const struct tgsi_full_declaration *decl);
+
+
+boolean
+lp_emit_instruction_aos(
+   struct lp_build_tgsi_aos_context *bld,
+   const struct tgsi_full_instruction *inst,
+   const struct tgsi_opcode_info *info,
+   int *pc);
+
+
+LLVMValueRef
+lp_emit_fetch_aos(
+   struct lp_build_tgsi_aos_context *bld,
+   const struct tgsi_full_instruction *inst,
+   unsigned src_op);
+
+
+void
+lp_emit_store_aos(
+   struct lp_build_tgsi_aos_context *bld,
+   const struct tgsi_full_instruction *inst,
+   unsigned index,
+   LLVMValueRef value);
 
 
 #endif /* LP_BLD_TGSI_H */
