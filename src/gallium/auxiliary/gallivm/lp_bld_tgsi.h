@@ -43,6 +43,13 @@
 #include "tgsi/tgsi_scan.h"
 
 
+#define CHAN_X 0
+#define CHAN_Y 1
+#define CHAN_Z 2
+#define CHAN_W 3
+#define NUM_CHANNELS 4
+
+
 struct tgsi_full_declaration;
 struct tgsi_full_instruction;
 struct tgsi_full_src_register;
@@ -209,6 +216,94 @@ lp_build_system_values_array(struct gallivm_state *gallivm,
                              const struct tgsi_shader_info *info,
                              LLVMValueRef instance_id,
                              LLVMValueRef facing);
+
+
+struct lp_exec_mask {
+   struct lp_build_context *bld;
+
+   boolean has_mask;
+
+   LLVMTypeRef int_vec_type;
+
+   LLVMValueRef cond_stack[LP_MAX_TGSI_NESTING];
+   int cond_stack_size;
+   LLVMValueRef cond_mask;
+
+   LLVMBasicBlockRef loop_block;
+   LLVMValueRef cont_mask;
+   LLVMValueRef break_mask;
+   LLVMValueRef break_var;
+   struct {
+      LLVMBasicBlockRef loop_block;
+      LLVMValueRef cont_mask;
+      LLVMValueRef break_mask;
+      LLVMValueRef break_var;
+   } loop_stack[LP_MAX_TGSI_NESTING];
+   int loop_stack_size;
+
+   LLVMValueRef ret_mask;
+   struct {
+      int pc;
+      LLVMValueRef ret_mask;
+   } call_stack[LP_MAX_TGSI_NESTING];
+   int call_stack_size;
+
+   LLVMValueRef exec_mask;
+};
+
+
+struct lp_build_tgsi_soa_context
+{
+   struct lp_build_context base;
+
+   /* Builder for vector integer masks and indices */
+   struct lp_build_context uint_bld;
+
+   /* Builder for scalar elements of shader's data type (float) */
+   struct lp_build_context elem_bld;
+
+   LLVMValueRef consts_ptr;
+   const LLVMValueRef *pos;
+   const LLVMValueRef (*inputs)[NUM_CHANNELS];
+   LLVMValueRef (*outputs)[NUM_CHANNELS];
+
+   const struct lp_build_sampler_soa *sampler;
+
+   LLVMValueRef immediates[LP_MAX_TGSI_IMMEDIATES][NUM_CHANNELS];
+   LLVMValueRef temps[LP_MAX_TGSI_TEMPS][NUM_CHANNELS];
+   LLVMValueRef addr[LP_MAX_TGSI_ADDRS][NUM_CHANNELS];
+   LLVMValueRef preds[LP_MAX_TGSI_PREDS][NUM_CHANNELS];
+
+   /* We allocate/use this array of temps if (1 << TGSI_FILE_TEMPORARY) is
+    * set in the indirect_files field.
+    * The temps[] array above is unused then.
+    */
+   LLVMValueRef temps_array;
+
+   /* We allocate/use this array of output if (1 << TGSI_FILE_OUTPUT) is
+    * set in the indirect_files field.
+    * The outputs[] array above is unused then.
+    */
+   LLVMValueRef outputs_array;
+
+   /* We allocate/use this array of inputs if (1 << TGSI_FILE_INPUT) is
+    * set in the indirect_files field.
+    * The inputs[] array above is unused then.
+    */
+   LLVMValueRef inputs_array;
+
+   LLVMValueRef system_values_array;
+
+   const struct tgsi_shader_info *info;
+   /** bitmask indicating which register files are accessed indirectly */
+   unsigned indirect_files;
+
+   struct lp_build_mask_context *mask;
+   struct lp_exec_mask exec_mask;
+
+   struct tgsi_full_instruction *instructions;
+   uint max_instructions;
+};
 
 
 struct lp_build_tgsi_aos_context
