@@ -304,6 +304,10 @@ struct lp_build_tgsi_soa_context
    struct tgsi_full_instruction *instructions;
    uint max_instructions;
 
+   /* Allow the user to store data in this structure rather than passing it
+    * to every function. */
+   void * userdata;
+
    LLVMValueRef (*emit_fetch_switch_file_fn)(struct lp_build_tgsi_soa_context *,
                                          const struct tgsi_full_src_register *,
                                          const unsigned);
