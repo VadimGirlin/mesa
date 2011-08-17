@@ -313,6 +313,43 @@ struct lp_build_tgsi_soa_context
                                          const unsigned);
 };
 
+void
+lp_emit_declaration_soa(
+   struct lp_build_tgsi_soa_context *bld,
+   const struct tgsi_full_declaration *decl);
+
+
+boolean
+lp_emit_instruction_soa(
+   struct lp_build_tgsi_soa_context *bld,
+   const struct tgsi_full_instruction *inst,
+   const struct tgsi_opcode_info *info,
+   int *pc);
+
+
+LLVMValueRef
+lp_emit_fetch_soa(
+   struct lp_build_tgsi_soa_context *bld,
+   const struct tgsi_full_instruction *inst,
+   unsigned src_op,
+   const unsigned chan_index );
+
+
+void
+lp_emit_store_soa(
+   struct lp_build_tgsi_soa_context *bld,
+   const struct tgsi_full_instruction *inst,
+   unsigned index,
+   unsigned chan_index,
+   LLVMValueRef pred,
+   LLVMValueRef value);
+
+LLVMValueRef
+lp_get_temp_ptr_soa(
+   struct lp_build_tgsi_soa_context *bld,
+   unsigned index,
+   unsigned chan);
+
 
 struct lp_build_tgsi_aos_context
 {
