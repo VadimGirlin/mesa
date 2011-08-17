@@ -303,6 +303,10 @@ struct lp_build_tgsi_soa_context
 
    struct tgsi_full_instruction *instructions;
    uint max_instructions;
+
+   LLVMValueRef (*emit_fetch_switch_file_fn)(struct lp_build_tgsi_soa_context *,
+                                         const struct tgsi_full_src_register *,
+                                         const unsigned);
 };
 
 

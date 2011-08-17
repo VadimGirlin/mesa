@@ -532,30 +532,18 @@ get_indirect_index(struct lp_build_tgsi_soa_context *bld,
    return index;
 }
 
-
-/**
- * Register fetch.
- */
 static LLVMValueRef
-emit_fetch(
+emit_fetch_switch_file(
    struct lp_build_tgsi_soa_context *bld,
-   const struct tgsi_full_instruction *inst,
-   unsigned src_op,
-   const unsigned chan_index )
+   const struct tgsi_full_src_register *reg,
+   const unsigned swizzle)
+
 {
    struct gallivm_state *gallivm = bld->base.gallivm;
    LLVMBuilderRef builder = gallivm->builder;
    struct lp_build_context *uint_bld = &bld->uint_bld;
-   const struct tgsi_full_src_register *reg = &inst->Src[src_op];
-   const unsigned swizzle =
-      tgsi_util_get_full_src_register_swizzle(reg, chan_index);
-   LLVMValueRef res;
    LLVMValueRef indirect_index = NULL;
-
-   if (swizzle > 3) {
-      assert(0 && "invalid swizzle in emit_fetch()");
-      return bld->base.undef;
-   }
+   LLVMValueRef res;
 
    if (reg->Register.Indirect) {
       indirect_index = get_indirect_index(bld,
@@ -690,6 +678,29 @@ emit_fetch(
       assert(0 && "invalid src register in emit_fetch()");
       return bld->base.undef;
    }
+   return res;
+}
+/**
+ * Register fetch.
+ */
+static LLVMValueRef
+emit_fetch(
+   struct lp_build_tgsi_soa_context *bld,
+   const struct tgsi_full_instruction *inst,
+   unsigned src_op,
+   const unsigned chan_index )
+{
+   const struct tgsi_full_src_register *reg = &inst->Src[src_op];
+   const unsigned swizzle =
+      tgsi_util_get_full_src_register_swizzle(reg, chan_index);
+   LLVMValueRef res;
+
+   if (swizzle > 3) {
+      assert(0 && "invalid swizzle in emit_fetch()");
+      return bld->base.undef;
+   }
+
+   res = bld->emit_fetch_switch_file_fn(bld, reg, swizzle);
 
    if (reg->Register.Absolute) {
       res = lp_build_abs( &bld->base, res );
@@ -2282,6 +2293,7 @@ lp_build_tgsi_soa(struct gallivm_state *gallivm,
    bld.sampler = sampler;
    bld.info = info;
    bld.indirect_files = info->indirect_files;
+   bld.emit_fetch_switch_file_fn = emit_fetch_switch_file;
    bld.instructions = (struct tgsi_full_instruction *)
                       MALLOC( LP_MAX_INSTRUCTIONS * sizeof(struct tgsi_full_instruction) );
    bld.max_instructions = LP_MAX_INSTRUCTIONS;
