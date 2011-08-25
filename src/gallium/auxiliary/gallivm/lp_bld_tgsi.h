@@ -49,6 +49,8 @@
 #define CHAN_W 3
 #define NUM_CHANNELS 4
 
+#define LP_MAX_INSTRUCTIONS 256
+
 
 struct tgsi_full_declaration;
 struct tgsi_full_instruction;

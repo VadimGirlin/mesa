@@ -58,9 +58,6 @@
 #include "lp_bld_debug.h"
 
 
-#define LP_MAX_INSTRUCTIONS 256
-
-
 /**
  * Wrapper around lp_build_swizzle_aos which translates swizzles to another 
  * ordering.

@@ -75,8 +75,6 @@
    FOR_EACH_CHANNEL( CHAN )\
       IF_IS_DST0_CHANNEL_ENABLED( INST, CHAN )
 
-#define LP_MAX_INSTRUCTIONS 256
-
 
 static void lp_exec_mask_init(struct lp_exec_mask *mask, struct lp_build_context *bld)
 {
