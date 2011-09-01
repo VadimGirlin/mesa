@@ -225,7 +225,7 @@ lp_emit_fetch_aos(
     * Swizzle the argument
     */
 
-   res = swizzle_aos(bld, res,
+   res = bld->emit_swizzle(bld, res,
                      reg->Register.SwizzleX,
                      reg->Register.SwizzleY,
                      reg->Register.SwizzleZ,
@@ -327,7 +327,7 @@ lp_emit_store_aos(
          pred = LLVMBuildNot(builder, pred, "");
       }
 
-      pred = swizzle_aos(bld, pred,
+      pred = bld->emit_swizzle(bld, pred,
                          inst->Predicate.SwizzleX,
                          inst->Predicate.SwizzleY,
                          inst->Predicate.SwizzleZ,
@@ -1039,6 +1039,7 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
    bld.instructions = (struct tgsi_full_instruction *)
                       MALLOC(LP_MAX_INSTRUCTIONS * sizeof(struct tgsi_full_instruction));
    bld.max_instructions = LP_MAX_INSTRUCTIONS;
+   bld.emit_swizzle = swizzle_aos;
 
    if (!bld.instructions) {
       return;

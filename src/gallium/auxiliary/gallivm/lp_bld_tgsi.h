@@ -399,6 +399,8 @@ struct lp_build_tgsi_aos_context
 
    LLVMValueRef (*emit_fetch_switch_file_fn)(struct lp_build_tgsi_aos_context *,
                                          const struct tgsi_full_src_register *);
+   LLVMValueRef (*emit_swizzle)(struct lp_build_tgsi_aos_context *,
+                         LLVMValueRef, unsigned, unsigned, unsigned, unsigned);
 };
 
 
