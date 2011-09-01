@@ -253,6 +253,19 @@ struct lp_exec_mask {
    LLVMValueRef exec_mask;
 };
 
+struct lp_build_tgsi_inst_list
+{
+   struct tgsi_full_instruction *instructions;
+   uint max_instructions;
+   uint num_instructions;
+};
+
+unsigned lp_bld_tgsi_list_init(struct lp_build_tgsi_inst_list * list);
+
+
+unsigned lp_bld_tgsi_add_instruction(
+   struct lp_build_tgsi_inst_list * list,
+   struct tgsi_full_instruction *inst_to_add);
 
 struct lp_build_tgsi_soa_context
 {
@@ -303,8 +316,7 @@ struct lp_build_tgsi_soa_context
    struct lp_build_mask_context *mask;
    struct lp_exec_mask exec_mask;
 
-   struct tgsi_full_instruction *instructions;
-   uint max_instructions;
+   struct lp_build_tgsi_inst_list inst_list;
 
    /* Allow the user to store data in this structure rather than passing it
     * to every function. */
@@ -390,8 +402,7 @@ struct lp_build_tgsi_aos_context
    /** bitmask indicating which register files are accessed indirectly */
    unsigned indirect_files;
 
-   struct tgsi_full_instruction *instructions;
-   uint max_instructions;
+   struct lp_build_tgsi_inst_list inst_list;
 
    /* Allow the user to store data in this structure rather than passing it
     * to every function. */

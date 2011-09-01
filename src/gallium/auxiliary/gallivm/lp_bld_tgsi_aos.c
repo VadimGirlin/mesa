@@ -1016,7 +1016,6 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
    struct lp_build_tgsi_aos_context bld;
    struct tgsi_parse_context parse;
    uint num_immediates = 0;
-   uint num_instructions = 0;
    unsigned chan;
    int pc = 0;
 
@@ -1036,12 +1035,9 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
    bld.sampler = sampler;
    bld.indirect_files = info->indirect_files;
    bld.emit_fetch_switch_file_fn = emit_fetch_switch_file;
-   bld.instructions = (struct tgsi_full_instruction *)
-                      MALLOC(LP_MAX_INSTRUCTIONS * sizeof(struct tgsi_full_instruction));
-   bld.max_instructions = LP_MAX_INSTRUCTIONS;
    bld.emit_swizzle = swizzle_aos;
 
-   if (!bld.instructions) {
+   if (!lp_bld_tgsi_list_init(&bld.inst_list)) {
       return;
    }
 
@@ -1057,29 +1053,9 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
          break;
 
       case TGSI_TOKEN_TYPE_INSTRUCTION:
-         {
-            /* save expanded instruction */
-            if (num_instructions == bld.max_instructions) {
-               struct tgsi_full_instruction *instructions;
-               instructions = REALLOC(bld.instructions,
-                                      bld.max_instructions
-                                      * sizeof(struct tgsi_full_instruction),
-                                      (bld.max_instructions + LP_MAX_INSTRUCTIONS)
-                                      * sizeof(struct tgsi_full_instruction));
-               if (!instructions) {
-                  break;
-               }
-               bld.instructions = instructions;
-               bld.max_instructions += LP_MAX_INSTRUCTIONS;
-            }
-
-            memcpy(bld.instructions + num_instructions,
-                   &parse.FullToken.FullInstruction,
-                   sizeof(bld.instructions[0]));
-
-            num_instructions++;
-         }
-
+         /* save expanded instruction */
+         lp_bld_tgsi_add_instruction(&bld.inst_list,
+                                     &parse.FullToken.FullInstruction);
          break;
 
       case TGSI_TOKEN_TYPE_IMMEDIATE:
@@ -1113,7 +1089,7 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
    }
 
    while (pc != -1) {
-      struct tgsi_full_instruction *instr = bld.instructions + pc;
+      struct tgsi_full_instruction *instr = bld.inst_list.instructions + pc;
       const struct tgsi_opcode_info *opcode_info =
          tgsi_get_opcode_info(instr->Instruction.Opcode);
       if (!lp_emit_instruction_aos(&bld, instr, opcode_info, &pc))
@@ -1137,6 +1113,6 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
       LLVMDumpModule(module);
    }
 
-   FREE(bld.instructions);
+   FREE(bld.inst_list.instructions);
 }
 
