@@ -2242,7 +2242,7 @@ lp_emit_instruction_soa(
       emit_fetch_predicate( bld, inst, pred );
 
       FOR_EACH_DST0_ENABLED_CHANNEL( inst, chan_index ) {
-         lp_emit_store_soa( bld, inst, 0, chan_index, pred[chan_index], dst0[chan_index]);
+         bld->emit_store( bld, inst, 0, chan_index, pred[chan_index], dst0[chan_index]);
       }
    }
 
@@ -2291,6 +2291,7 @@ lp_build_tgsi_soa(struct gallivm_state *gallivm,
    bld.info = info;
    bld.indirect_files = info->indirect_files;
    bld.emit_fetch_switch_file_fn = emit_fetch_switch_file;
+   bld.emit_store = lp_emit_store_soa;
 
    if (!lp_bld_tgsi_list_init(&bld.inst_list)) {
       return;

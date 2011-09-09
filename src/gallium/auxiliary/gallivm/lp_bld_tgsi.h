@@ -325,6 +325,10 @@ struct lp_build_tgsi_soa_context
    LLVMValueRef (*emit_fetch_switch_file_fn)(struct lp_build_tgsi_soa_context *,
                                          const struct tgsi_full_src_register *,
                                          const unsigned);
+
+   void (*emit_store)(struct lp_build_tgsi_soa_context *,
+                      const struct tgsi_full_instruction *, unsigned,
+                      unsigned, LLVMValueRef,  LLVMValueRef);
 };
 
 void
@@ -410,6 +414,11 @@ struct lp_build_tgsi_aos_context
 
    LLVMValueRef (*emit_fetch_switch_file_fn)(struct lp_build_tgsi_aos_context *,
                                          const struct tgsi_full_src_register *);
+
+   void (*emit_store)(struct lp_build_tgsi_aos_context *,
+                      const struct tgsi_full_instruction *,
+                      unsigned,  LLVMValueRef);
+
    LLVMValueRef (*emit_swizzle)(struct lp_build_tgsi_aos_context *,
                          LLVMValueRef, unsigned, unsigned, unsigned, unsigned);
 };

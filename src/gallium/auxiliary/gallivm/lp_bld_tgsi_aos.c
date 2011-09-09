@@ -995,7 +995,7 @@ lp_emit_instruction_aos(
    }
    
    if (info->num_dst) {
-      lp_emit_store_aos(bld, inst, 0, dst0);
+      bld->emit_store(bld, inst, 0, dst0);
    }
 
    return TRUE;
@@ -1035,6 +1035,7 @@ lp_build_tgsi_aos(struct gallivm_state *gallivm,
    bld.sampler = sampler;
    bld.indirect_files = info->indirect_files;
    bld.emit_fetch_switch_file_fn = emit_fetch_switch_file;
+   bld.emit_store = lp_emit_store_aos;
    bld.emit_swizzle = swizzle_aos;
 
    if (!lp_bld_tgsi_list_init(&bld.inst_list)) {
