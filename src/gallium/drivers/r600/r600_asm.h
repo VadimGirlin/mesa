@@ -218,4 +218,11 @@ int r600_vertex_elements_build_fetch_shader(struct r600_pipe_context *rctx, stru
 void r700_bytecode_cf_vtx_build(uint32_t *bytecode, const struct r600_bytecode_cf *cf);
 int r700_bytecode_alu_build(struct r600_bytecode *bc, struct r600_bytecode_alu *alu, unsigned id);
 
+int r600_is_alu_reduction_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu);
+int r600_is_alu_trans_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu);
+int r600_is_alu_vec_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu);
+int r600_bytecode_alu_nliterals(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
+				 uint32_t literal[4], unsigned *nliteral);
+unsigned int r600_bytecode_get_num_operands(struct r600_bytecode *bc, struct r600_bytecode_alu *alu);
+
 #endif

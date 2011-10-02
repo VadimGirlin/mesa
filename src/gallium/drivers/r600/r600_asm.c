@@ -36,7 +36,7 @@
 #define NUM_OF_CYCLES 3
 #define NUM_OF_COMPONENTS 4
 
-static inline unsigned int r600_bytecode_get_num_operands(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
+unsigned int r600_bytecode_get_num_operands(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
 	if(alu->is_op3)
 		return 3;
@@ -384,7 +384,7 @@ static int is_alu_once_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *
 	}
 }
 
-static int is_alu_reduction_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
+int r600_is_alu_reduction_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
 	switch (bc->chip_class) {
 	case R600:
@@ -438,17 +438,17 @@ static int is_alu_mova_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *
 }
 
 /* alu instructions that can only execute on the vector unit */
-static int is_alu_vec_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
+int r600_is_alu_vec_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
 	switch (bc->chip_class) {
 	case R600:
 	case R700:
-		return is_alu_reduction_inst(bc, alu) ||
+		return r600_is_alu_reduction_inst(bc, alu) ||
 			is_alu_mova_inst(bc, alu);
 	case EVERGREEN:
 	case CAYMAN:
 	default:
-		return is_alu_reduction_inst(bc, alu) ||
+		return r600_is_alu_reduction_inst(bc, alu) ||
 			is_alu_mova_inst(bc, alu) ||
 			(alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_FLT_TO_INT ||
 			 alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_FLT_TO_INT_FLOOR ||
@@ -458,7 +458,7 @@ static int is_alu_vec_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_a
 }
 
 /* alu instructions that can only execute on the trans unit */
-static int is_alu_trans_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
+int r600_is_alu_trans_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
 	switch (bc->chip_class) {
 	case R600:
@@ -532,8 +532,8 @@ static int is_alu_trans_unit_inst(struct r600_bytecode *bc, struct r600_bytecode
 /* alu instructions that can execute on any unit */
 static int is_alu_any_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
-	return !is_alu_vec_unit_inst(bc, alu) &&
-		!is_alu_trans_unit_inst(bc, alu);
+	return !r600_is_alu_vec_unit_inst(bc, alu) &&
+		!r600_is_alu_trans_unit_inst(bc, alu);
 }
 
 static int assign_alu_units(struct r600_bytecode *bc, struct r600_bytecode_alu *alu_first,
@@ -550,9 +550,9 @@ static int assign_alu_units(struct r600_bytecode *bc, struct r600_bytecode_alu *
 		chan = alu->dst.chan;
 		if (max_slots == 4)
 			trans = 0;
-		else if (is_alu_trans_unit_inst(bc, alu))
+		else if (r600_is_alu_trans_unit_inst(bc, alu))
 			trans = 1;
-		else if (is_alu_vec_unit_inst(bc, alu))
+		else if (r600_is_alu_vec_unit_inst(bc, alu))
 			trans = 0;
 		else if (assignment[chan])
 			trans = 1; /* Assume ALU_INST_PREFER_VECTOR. */
@@ -842,7 +842,7 @@ static int replace_gpr_with_pv_ps(struct r600_bytecode *bc,
 		if (prev[i] && (prev[i]->dst.write || prev[i]->is_op3) && !prev[i]->dst.rel) {
 			gpr[i] = prev[i]->dst.sel;
 			/* cube writes more than PV.X */
-			if (!is_alu_cube_inst(bc, prev[i]) && is_alu_reduction_inst(bc, prev[i]))
+			if (!is_alu_cube_inst(bc, prev[i]) && r600_is_alu_reduction_inst(bc, prev[i]))
 				chan[i] = 0;
 			else
 				chan[i] = prev[i]->dst.chan;
@@ -916,7 +916,7 @@ void r600_bytecode_special_constants(u32 value, unsigned *sel, unsigned *neg)
 }
 
 /* compute how many literal are needed */
-static int r600_bytecode_alu_nliterals(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
+int r600_bytecode_alu_nliterals(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
 				 uint32_t literal[4], unsigned *nliteral)
 {
 	unsigned num_src = r600_bytecode_get_num_operands(bc, alu);
