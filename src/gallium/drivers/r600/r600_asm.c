@@ -1112,6 +1112,9 @@ static int merge_inst_groups(struct r600_bytecode *bc, struct r600_bytecode_alu 
 				have_rel = 1;
 			}
 
+			if ((alu->src[src].sel == V_SQ_ALU_SRC_PS) || (alu->src[src].sel == V_SQ_ALU_SRC_PV))
+				return 0;
+
 			/* Constants don't matter. */
 			if (!is_gpr(alu->src[src].sel))
 				continue;
