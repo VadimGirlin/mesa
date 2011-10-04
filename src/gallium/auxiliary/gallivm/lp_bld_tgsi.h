@@ -51,6 +51,18 @@
 
 #define LP_MAX_INSTRUCTIONS 256
 
+#define FOR_EACH_CHANNEL( CHAN )\
+   for (CHAN = 0; CHAN < NUM_CHANNELS; CHAN++)
+
+#define IS_DST0_CHANNEL_ENABLED( INST, CHAN )\
+   ((INST)->Dst[0].Register.WriteMask & (1 << (CHAN)))
+
+#define IF_IS_DST0_CHANNEL_ENABLED( INST, CHAN )\
+   if (IS_DST0_CHANNEL_ENABLED( INST, CHAN ))
+
+#define FOR_EACH_DST0_ENABLED_CHANNEL( INST, CHAN )\
+   FOR_EACH_CHANNEL( CHAN )\
+      IF_IS_DST0_CHANNEL_ENABLED( INST, CHAN )
 
 struct tgsi_full_declaration;
 struct tgsi_full_instruction;

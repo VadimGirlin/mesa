@@ -62,20 +62,6 @@
 #include "lp_bld_printf.h"
 
 
-#define FOR_EACH_CHANNEL( CHAN )\
-   for (CHAN = 0; CHAN < NUM_CHANNELS; CHAN++)
-
-#define IS_DST0_CHANNEL_ENABLED( INST, CHAN )\
-   ((INST)->Dst[0].Register.WriteMask & (1 << (CHAN)))
-
-#define IF_IS_DST0_CHANNEL_ENABLED( INST, CHAN )\
-   if (IS_DST0_CHANNEL_ENABLED( INST, CHAN ))
-
-#define FOR_EACH_DST0_ENABLED_CHANNEL( INST, CHAN )\
-   FOR_EACH_CHANNEL( CHAN )\
-      IF_IS_DST0_CHANNEL_ENABLED( INST, CHAN )
-
-
 static void lp_exec_mask_init(struct lp_exec_mask *mask, struct lp_build_context *bld)
 {
    mask->bld = bld;
