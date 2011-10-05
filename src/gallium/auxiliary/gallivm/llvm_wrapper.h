@@ -1,0 +1,2 @@
+
+LLVMValueRef LLVMGetBasicBlockTerminator(LLVMBasicBlockRef BB);

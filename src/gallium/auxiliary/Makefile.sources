@@ -69,6 +69,7 @@ C_SOURCES := \
 	tgsi/tgsi_exec.c \
 	tgsi/tgsi_info.c \
 	tgsi/tgsi_iterate.c \
+	tgsi/tgsi_llvm.c \
 	tgsi/tgsi_parse.c \
 	tgsi/tgsi_ppc.c \
 	tgsi/tgsi_sanity.c \
@@ -187,5 +188,6 @@ GALLIVM_SOURCES := \
         draw/draw_pt_fetch_shade_pipeline_llvm.c
 
 GALLIVM_CPP_SOURCES := \
+	gallivm/llvm_wrapper.cpp \
 	gallivm/lp_bld_debug.cpp \
 	gallivm/lp_bld_misc.cpp
