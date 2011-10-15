@@ -215,6 +215,10 @@ struct r600_bytecode {
 	unsigned	ar_reg;
 	unsigned        ar_handling;
 	unsigned        r6xx_nop_after_rel_dst;
+	/* 0 - building from r600_shader_from_tgsi,
+	 * 1 - building optimized bytecode (some checks disabled, because
+	 * 		they are handled by r600_shader_optimize) */
+	unsigned		opt_build;
 };
 
 /* eg_asm.c */
