@@ -180,6 +180,10 @@ struct r600_bytecode {
 	struct r600_cf_callstack	callstack[SQ_MAX_CALL_DEPTH];
 	unsigned	ar_loaded;
 	unsigned	ar_reg;
+	/* 0 - building from r600_shader_from_tgsi,
+	 * 1 - building optimized bytecode (some checks disabled, because
+	 * 		they are handled by r600_shader_optimize) */
+	unsigned		opt_build;
 };
 
 /* eg_asm.c */
