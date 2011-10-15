@@ -1481,7 +1481,7 @@ int r600_bytecode_add_alu_type(struct r600_bytecode *bc, const struct r600_bytec
 		if (r)
 			return r;
 
-		if (bc->cf_last->prev_bs_head) {
+		if (!bc->opt_build && bc->cf_last->prev_bs_head) {
 			r = merge_inst_groups(bc, slots, bc->cf_last->prev_bs_head);
 			if (r)
 				return r;
@@ -1493,9 +1493,11 @@ int r600_bytecode_add_alu_type(struct r600_bytecode *bc, const struct r600_bytec
 				return r;
 		}
 
-		r = check_and_set_bank_swizzle(bc, slots);
-		if (r)
-			return r;
+		if (!bc->opt_build) {
+			r = check_and_set_bank_swizzle(bc, slots);
+			if (r)
+				return r;
+		}
 
 		for (i = 0, nliteral = 0; i < max_slots; i++) {
 			if (slots[i]) {
@@ -1508,7 +1510,7 @@ int r600_bytecode_add_alu_type(struct r600_bytecode *bc, const struct r600_bytec
 
 		/* at most 128 slots, one add alu can add 5 slots + 4 constants(2 slots)
 		 * worst case */
-		if ((bc->cf_last->ndw >> 1) >= 120) {
+		if (!bc->opt_build && (bc->cf_last->ndw >> 1) >= 120) {
 			bc->force_add_cf = 1;
 		}
 
