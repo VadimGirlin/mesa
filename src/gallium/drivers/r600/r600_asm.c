@@ -1643,6 +1643,35 @@ int r600_bytecode_add_vtx(struct r600_bytecode *bc, const struct r600_bytecode_v
 	return 0;
 }
 
+static int r600_bytecode_tex_interference(struct r600_bytecode *bc,
+                                          const struct r600_bytecode_tex *ttex,
+                                          const struct r600_bytecode_tex *ntex)
+{
+	if (ttex->dst_gpr == ntex->src_gpr &&
+			ttex->inst != SQ_TEX_INST_SET_GRADIENTS_H &&
+			ttex->inst != SQ_TEX_INST_SET_GRADIENTS_V) {
+
+		/* when gprs are the same, we need to check the components -
+		 * possibly we have no interference (e.g. write to xy and then read from zw)
+		 */
+
+		unsigned swz[2][4], i;
+		swz[0][0] = ttex->dst_sel_x;
+		swz[0][1] = ttex->dst_sel_y;
+		swz[0][2] = ttex->dst_sel_z;
+		swz[0][3] = ttex->dst_sel_w;
+		swz[1][0] = ntex->src_sel_x;
+		swz[1][1] = ntex->src_sel_y;
+		swz[1][2] = ntex->src_sel_z;
+		swz[1][3] = ntex->src_sel_w;
+
+		for (i=0; i<4; i++)
+			if (swz[1][i]<4 && swz[0][swz[1][i]]!=7)
+				return 1;
+	}
+	return 0;
+}
+
 int r600_bytecode_add_tex(struct r600_bytecode *bc, const struct r600_bytecode_tex *tex)
 {
 	struct r600_bytecode_tex *ntex = r600_bytecode_tex();
@@ -1657,7 +1686,7 @@ int r600_bytecode_add_tex(struct r600_bytecode *bc, const struct r600_bytecode_t
 		bc->cf_last->inst == BC_INST(bc, V_SQ_CF_WORD1_SQ_CF_INST_TEX)) {
 		struct r600_bytecode_tex *ttex;
 		LIST_FOR_EACH_ENTRY(ttex, &bc->cf_last->tex, list) {
-			if (ttex->dst_gpr == ntex->src_gpr) {
+			if (r600_bytecode_tex_interference(bc, ttex, ntex)) {
 				bc->force_add_cf = 1;
 				break;
 			}
