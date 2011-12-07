@@ -1,4 +1,9 @@
 C_SOURCES := \
+	opt_core.c \
+	opt_sched.c \
+	opt_vars.c \
+	opt_color.c \
+	opt_dump.c \
 	r600_asm.c \
 	r600_blit.c \
 	r600_buffer.c \
