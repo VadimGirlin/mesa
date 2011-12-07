@@ -754,15 +754,11 @@ static int check_and_set_bank_swizzle(struct r600_bytecode *bc,
 
 	for (i = 0; i < max_slots; i++) {
 		if (slots[i]) {
-			if (slots[i]->bank_swizzle_force) {
-				slots[i]->bank_swizzle = slots[i]->bank_swizzle_force;
-			} else {
+			if (!slots[i]->bank_swizzle_force)
 				forced = 0;
-			}
+			if (i < 4)
+				scalar_only = false;
 		}
-
-		if (i < 4 && slots[i])
-			scalar_only = false;
 	}
 	if (forced)
 		return 0;

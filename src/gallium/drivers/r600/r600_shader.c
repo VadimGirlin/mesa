@@ -381,7 +381,8 @@ static int evergreen_interp_alu(struct r600_shader_ctx *ctx, int input)
 
 		alu.src[1].sel = V_SQ_ALU_SRC_PARAM_BASE + ctx->shader->input[input].lds_pos;
 
-		alu.bank_swizzle_force = SQ_ALU_VEC_210;
+		alu.bank_swizzle = SQ_ALU_VEC_210;
+		alu.bank_swizzle_force = 1;
 		if ((i % 4) == 3)
 			alu.last = 1;
 		r = r600_bytecode_add_alu(ctx->bc, &alu);
