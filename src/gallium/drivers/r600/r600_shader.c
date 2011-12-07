@@ -682,10 +682,10 @@ static int tgsi_fetch_rel_const(struct r600_shader_ctx *ctx, unsigned int offset
 	vtx.src_gpr = ar_reg;
 	vtx.mega_fetch_count = 16;
 	vtx.dst_gpr = dst_reg;
-	vtx.dst_sel_x = 0;		/* SEL_X */
-	vtx.dst_sel_y = 1;		/* SEL_Y */
-	vtx.dst_sel_z = 2;		/* SEL_Z */
-	vtx.dst_sel_w = 3;		/* SEL_W */
+	vtx.dst_sel[0] = 0;		/* SEL_X */
+	vtx.dst_sel[1] = 1;		/* SEL_Y */
+	vtx.dst_sel[2] = 2;		/* SEL_Z */
+	vtx.dst_sel[3] = 3;		/* SEL_W */
 	vtx.data_format = FMT_32_32_32_32_FLOAT;
 	vtx.num_format_all = 2;		/* NUM_FORMAT_SCALED */
 	vtx.format_comp_all = 1;	/* FORMAT_COMP_SIGNED */
@@ -1259,10 +1259,10 @@ static int r600_shader_from_tgsi(struct r600_pipe_context * rctx, struct r600_pi
 		memset(&output[i], 0, sizeof(struct r600_bytecode_output));
 		output[i + j].gpr = shader->output[i].gpr;
 		output[i + j].elem_size = 3;
-		output[i + j].swizzle_x = 0;
-		output[i + j].swizzle_y = 1;
-		output[i + j].swizzle_z = 2;
-		output[i + j].swizzle_w = 3;
+		output[i + j].swizzle[0] = 0;
+		output[i + j].swizzle[1] = 1;
+		output[i + j].swizzle[2] = 2;
+		output[i + j].swizzle[3] = 3;
 		output[i + j].burst_count = 1;
 		output[i + j].barrier = 1;
 		output[i + j].type = V_SQ_CF_ALLOC_EXPORT_WORD0_SQ_EXPORT_PARAM;
@@ -1292,10 +1292,10 @@ static int r600_shader_from_tgsi(struct r600_pipe_context * rctx, struct r600_pi
 						memset(&output[i + j], 0, sizeof(struct r600_bytecode_output));
 						output[i + j].gpr = shader->output[i].gpr;
 						output[i + j].elem_size = 3;
-						output[i + j].swizzle_x = 0;
-						output[i + j].swizzle_y = 1;
-						output[i + j].swizzle_z = 2;
-						output[i + j].swizzle_w = 3;
+						output[i + j].swizzle[0] = 0;
+						output[i + j].swizzle[1] = 1;
+						output[i + j].swizzle[2] = 2;
+						output[i + j].swizzle[3] = 3;
 						output[i + j].burst_count = 1;
 						output[i + j].barrier = 1;
 						output[i + j].array_base = shader->output[i].sid + j;
@@ -1306,15 +1306,15 @@ static int r600_shader_from_tgsi(struct r600_pipe_context * rctx, struct r600_pi
 				}
 			} else if (shader->output[i].name == TGSI_SEMANTIC_POSITION) {
 				output[i + j].array_base = 61;
-				output[i + j].swizzle_x = 2;
-				output[i + j].swizzle_y = 7;
-				output[i + j].swizzle_z = output[i + j].swizzle_w = 7;
+				output[i + j].swizzle[0] = 2;
+				output[i + j].swizzle[1] = 7;
+				output[i + j].swizzle[2] = output[i + j].swizzle[3] = 7;
 				output[i + j].type = V_SQ_CF_ALLOC_EXPORT_WORD0_SQ_EXPORT_PIXEL;
 			} else if (shader->output[i].name == TGSI_SEMANTIC_STENCIL) {
 				output[i + j].array_base = 61;
-				output[i + j].swizzle_x = 7;
-				output[i + j].swizzle_y = 1;
-				output[i + j].swizzle_z = output[i + j].swizzle_w = 7;
+				output[i + j].swizzle[0] = 7;
+				output[i + j].swizzle[1] = 1;
+				output[i + j].swizzle[2] = output[i + j].swizzle[3] = 7;
 				output[i + j].type = V_SQ_CF_ALLOC_EXPORT_WORD0_SQ_EXPORT_PIXEL;
 			} else {
 				R600_ERR("unsupported fragment output name %d\n", shader->output[i].name);
@@ -1341,10 +1341,10 @@ static int r600_shader_from_tgsi(struct r600_pipe_context * rctx, struct r600_pi
 			memset(&output[i], 0, sizeof(struct r600_bytecode_output));
 			output[i].gpr = 0;
 			output[i].elem_size = 3;
-			output[i].swizzle_x = 7;
-			output[i].swizzle_y = 7;
-			output[i].swizzle_z = 7;
-			output[i].swizzle_w = 7;
+			output[i].swizzle[0] = 7;
+			output[i].swizzle[1] = 7;
+			output[i].swizzle[2] = 7;
+			output[i].swizzle[3] = 7;
 			output[i].burst_count = 1;
 			output[i].barrier = 1;
 			output[i].type = V_SQ_CF_ALLOC_EXPORT_WORD0_SQ_EXPORT_PARAM;
@@ -1358,10 +1358,10 @@ static int r600_shader_from_tgsi(struct r600_pipe_context * rctx, struct r600_pi
 		memset(&output[0], 0, sizeof(struct r600_bytecode_output));
 		output[0].gpr = 0;
 		output[0].elem_size = 3;
-		output[0].swizzle_x = 7;
-		output[0].swizzle_y = 7;
-		output[0].swizzle_z = 7;
-		output[0].swizzle_w = 7;
+		output[i].swizzle[0] = 7;
+		output[i].swizzle[1] = 7;
+		output[i].swizzle[2] = 7;
+		output[i].swizzle[3] = 7;
 		output[0].burst_count = 1;
 		output[0].barrier = 1;
 		output[0].type = V_SQ_CF_ALLOC_EXPORT_WORD0_SQ_EXPORT_PIXEL;
@@ -2414,10 +2414,10 @@ static int tgsi_tex(struct r600_shader_ctx *ctx)
 
 			if (tgsi_tex_src_requires_loading(ctx, i)) {
 				tex.src_gpr = r600_get_temp(ctx);
-				tex.src_sel_x = 0;
-				tex.src_sel_y = 1;
-				tex.src_sel_z = 2;
-				tex.src_sel_w = 3;
+				tex.src_sel[0] = 0;
+				tex.src_sel[1] = 1;
+				tex.src_sel[2] = 2;
+				tex.src_sel[3] = 3;
 
 				for (j = 0; j < 4; j++) {
 					memset(&alu, 0, sizeof(struct r600_bytecode_alu));
@@ -2435,14 +2435,14 @@ static int tgsi_tex(struct r600_shader_ctx *ctx)
 
 			} else {
 				tex.src_gpr = tgsi_tex_get_src_gpr(ctx, i);
-				tex.src_sel_x = ctx->src[i].swizzle[0];
-				tex.src_sel_y = ctx->src[i].swizzle[1];
-				tex.src_sel_z = ctx->src[i].swizzle[2];
-				tex.src_sel_w = ctx->src[i].swizzle[3];
+				tex.src_sel[0] = ctx->src[i].swizzle[0];
+				tex.src_sel[1] = ctx->src[i].swizzle[1];
+				tex.src_sel[2] = ctx->src[i].swizzle[2];
+				tex.src_sel[3] = ctx->src[i].swizzle[3];
 				tex.src_rel = ctx->src[i].rel;
 			}
 			tex.dst_gpr = ctx->temp_reg; /* just to avoid confusing the asm scheduler */
-			tex.dst_sel_x = tex.dst_sel_y = tex.dst_sel_z = tex.dst_sel_w = 7;
+			tex.dst_sel[0] = tex.dst_sel[1] = tex.dst_sel[2] = tex.dst_sel[3] = 7;
 			if (inst->Texture.Texture != TGSI_TEXTURE_RECT) {
 				tex.coord_type_x = 1;
 				tex.coord_type_y = 1;
@@ -2668,28 +2668,28 @@ static int tgsi_tex(struct r600_shader_ctx *ctx)
 	tex.resource_id = tex.sampler_id + R600_MAX_CONST_BUFFERS;
 	tex.src_gpr = src_gpr;
 	tex.dst_gpr = ctx->file_offset[inst->Dst[0].Register.File] + inst->Dst[0].Register.Index;
-	tex.dst_sel_x = (inst->Dst[0].Register.WriteMask & 1) ? 0 : 7;
-	tex.dst_sel_y = (inst->Dst[0].Register.WriteMask & 2) ? 1 : 7;
-	tex.dst_sel_z = (inst->Dst[0].Register.WriteMask & 4) ? 2 : 7;
-	tex.dst_sel_w = (inst->Dst[0].Register.WriteMask & 8) ? 3 : 7;
+	tex.dst_sel[0] = (inst->Dst[0].Register.WriteMask & 1) ? 0 : 7;
+	tex.dst_sel[1] = (inst->Dst[0].Register.WriteMask & 2) ? 1 : 7;
+	tex.dst_sel[2] = (inst->Dst[0].Register.WriteMask & 4) ? 2 : 7;
+	tex.dst_sel[3] = (inst->Dst[0].Register.WriteMask & 8) ? 3 : 7;
 	if (src_loaded) {
-		tex.src_sel_x = 0;
-		tex.src_sel_y = 1;
-		tex.src_sel_z = 2;
-		tex.src_sel_w = 3;
+		tex.src_sel[0] = 0;
+		tex.src_sel[1] = 1;
+		tex.src_sel[2] = 2;
+		tex.src_sel[3] = 3;
 	} else {
-		tex.src_sel_x = ctx->src[0].swizzle[0];
-		tex.src_sel_y = ctx->src[0].swizzle[1];
-		tex.src_sel_z = ctx->src[0].swizzle[2];
-		tex.src_sel_w = ctx->src[0].swizzle[3];
+		tex.src_sel[0] = ctx->src[0].swizzle[0];
+		tex.src_sel[1] = ctx->src[0].swizzle[1];
+		tex.src_sel[2] = ctx->src[0].swizzle[2];
+		tex.src_sel[3] = ctx->src[0].swizzle[3];
 		tex.src_rel = ctx->src[0].rel;
 	}
 
 	if (inst->Texture.Texture == TGSI_TEXTURE_CUBE) {
-		tex.src_sel_x = 1;
-		tex.src_sel_y = 0;
-		tex.src_sel_z = 3;
-		tex.src_sel_w = 1;
+		tex.src_sel[0] = 1;
+		tex.src_sel[1] = 0;
+		tex.src_sel[2] = 3;
+		tex.src_sel[3] = 1;
 	}
 
 	if (inst->Texture.Texture != TGSI_TEXTURE_RECT &&
@@ -2713,7 +2713,7 @@ static int tgsi_tex(struct r600_shader_ctx *ctx)
 	     inst->Texture.Texture == TGSI_TEXTURE_SHADOW1D_ARRAY) &&
 	    opcode != SQ_TEX_INST_SAMPLE_C_L &&
 	    opcode != SQ_TEX_INST_SAMPLE_C_LB) {
-		tex.src_sel_w = tex.src_sel_z;
+		tex.src_sel[3] = tex.src_sel[2];
 	}
 
 	if (inst->Texture.Texture == TGSI_TEXTURE_1D_ARRAY ||
@@ -2725,7 +2725,7 @@ static int tgsi_tex(struct r600_shader_ctx *ctx)
 		} else {
 			/* the array index is read from Z */
 			tex.coord_type_z = 0;
-			tex.src_sel_z = tex.src_sel_y;
+			tex.src_sel[2] = tex.src_sel[1];
 		}
 	} else if (inst->Texture.Texture == TGSI_TEXTURE_2D_ARRAY ||
 		   inst->Texture.Texture == TGSI_TEXTURE_SHADOW2D_ARRAY)

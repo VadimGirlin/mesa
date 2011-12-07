@@ -268,10 +268,10 @@ int r600_bytecode_add_output(struct r600_bytecode *bc, const struct r600_bytecod
 		output->inst == BC_INST(bc, V_SQ_CF_ALLOC_EXPORT_WORD1_SQ_CF_INST_EXPORT_DONE))) &&
 		output->type == bc->cf_last->output.type &&
 		output->elem_size == bc->cf_last->output.elem_size &&
-		output->swizzle_x == bc->cf_last->output.swizzle_x &&
-		output->swizzle_y == bc->cf_last->output.swizzle_y &&
-		output->swizzle_z == bc->cf_last->output.swizzle_z &&
-		output->swizzle_w == bc->cf_last->output.swizzle_w &&
+		output->swizzle[0] == bc->cf_last->output.swizzle[0] &&
+		output->swizzle[1] == bc->cf_last->output.swizzle[1] &&
+		output->swizzle[2] == bc->cf_last->output.swizzle[2] &&
+		output->swizzle[3] == bc->cf_last->output.swizzle[3] &&
 		(output->burst_count + bc->cf_last->output.burst_count) <= 16) {
 
 		if ((output->gpr + output->burst_count) == bc->cf_last->output.gpr &&
@@ -1471,18 +1471,10 @@ static int r600_bytecode_tex_interference(struct r600_bytecode *bc,
 		 * possibly we have no interference (e.g. write to xy and then read from zw)
 		 */
 
-		unsigned swz[2][4], i;
-		swz[0][0] = ttex->dst_sel_x;
-		swz[0][1] = ttex->dst_sel_y;
-		swz[0][2] = ttex->dst_sel_z;
-		swz[0][3] = ttex->dst_sel_w;
-		swz[1][0] = ntex->src_sel_x;
-		swz[1][1] = ntex->src_sel_y;
-		swz[1][2] = ntex->src_sel_z;
-		swz[1][3] = ntex->src_sel_w;
+		unsigned i;
 
 		for (i=0; i<4; i++)
-			if (swz[1][i]<4 && swz[0][swz[1][i]]!=7)
+			if (ntex->src_sel[i]<4 && ttex->dst_sel[ntex->src_sel[i]]!=7)
 				return 1;
 	}
 	return 0;
@@ -1561,14 +1553,14 @@ static int r600_bytecode_vtx_build(struct r600_bytecode *bc, struct r600_bytecod
 	bc->bytecode[id] = S_SQ_VTX_WORD0_BUFFER_ID(vtx->buffer_id) |
 			S_SQ_VTX_WORD0_FETCH_TYPE(vtx->fetch_type) |
 			S_SQ_VTX_WORD0_SRC_GPR(vtx->src_gpr) |
-			S_SQ_VTX_WORD0_SRC_SEL_X(vtx->src_sel_x);
+			S_SQ_VTX_WORD0_SRC_SEL_X(vtx->src_sel[0]);
 	if (bc->chip_class < CAYMAN)
 		bc->bytecode[id] |= S_SQ_VTX_WORD0_MEGA_FETCH_COUNT(vtx->mega_fetch_count);
 	id++;
-	bc->bytecode[id++] = S_SQ_VTX_WORD1_DST_SEL_X(vtx->dst_sel_x) |
-				S_SQ_VTX_WORD1_DST_SEL_Y(vtx->dst_sel_y) |
-				S_SQ_VTX_WORD1_DST_SEL_Z(vtx->dst_sel_z) |
-				S_SQ_VTX_WORD1_DST_SEL_W(vtx->dst_sel_w) |
+	bc->bytecode[id++] = S_SQ_VTX_WORD1_DST_SEL_X(vtx->dst_sel[0]) |
+				S_SQ_VTX_WORD1_DST_SEL_Y(vtx->dst_sel[1]) |
+				S_SQ_VTX_WORD1_DST_SEL_Z(vtx->dst_sel[2]) |
+				S_SQ_VTX_WORD1_DST_SEL_W(vtx->dst_sel[3]) |
 				S_SQ_VTX_WORD1_USE_CONST_FIELDS(vtx->use_const_fields) |
 				S_SQ_VTX_WORD1_DATA_FORMAT(vtx->data_format) |
 				S_SQ_VTX_WORD1_NUM_FORMAT_ALL(vtx->num_format_all) |
@@ -1593,10 +1585,10 @@ static int r600_bytecode_tex_build(struct r600_bytecode *bc, struct r600_bytecod
 				S_SQ_TEX_WORD0_SRC_REL(tex->src_rel);
 	bc->bytecode[id++] = S_SQ_TEX_WORD1_DST_GPR(tex->dst_gpr) |
 				S_SQ_TEX_WORD1_DST_REL(tex->dst_rel) |
-				S_SQ_TEX_WORD1_DST_SEL_X(tex->dst_sel_x) |
-				S_SQ_TEX_WORD1_DST_SEL_Y(tex->dst_sel_y) |
-				S_SQ_TEX_WORD1_DST_SEL_Z(tex->dst_sel_z) |
-				S_SQ_TEX_WORD1_DST_SEL_W(tex->dst_sel_w) |
+				S_SQ_TEX_WORD1_DST_SEL_X(tex->dst_sel[0]) |
+				S_SQ_TEX_WORD1_DST_SEL_Y(tex->dst_sel[1]) |
+				S_SQ_TEX_WORD1_DST_SEL_Z(tex->dst_sel[2]) |
+				S_SQ_TEX_WORD1_DST_SEL_W(tex->dst_sel[3]) |
 				S_SQ_TEX_WORD1_LOD_BIAS(tex->lod_bias) |
 				S_SQ_TEX_WORD1_COORD_TYPE_X(tex->coord_type_x) |
 				S_SQ_TEX_WORD1_COORD_TYPE_Y(tex->coord_type_y) |
@@ -1606,10 +1598,10 @@ static int r600_bytecode_tex_build(struct r600_bytecode *bc, struct r600_bytecod
 				S_SQ_TEX_WORD2_OFFSET_Y(tex->offset_y) |
 				S_SQ_TEX_WORD2_OFFSET_Z(tex->offset_z) |
 				S_SQ_TEX_WORD2_SAMPLER_ID(tex->sampler_id) |
-				S_SQ_TEX_WORD2_SRC_SEL_X(tex->src_sel_x) |
-				S_SQ_TEX_WORD2_SRC_SEL_Y(tex->src_sel_y) |
-				S_SQ_TEX_WORD2_SRC_SEL_Z(tex->src_sel_z) |
-				S_SQ_TEX_WORD2_SRC_SEL_W(tex->src_sel_w);
+				S_SQ_TEX_WORD2_SRC_SEL_X(tex->src_sel[0]) |
+				S_SQ_TEX_WORD2_SRC_SEL_Y(tex->src_sel[1]) |
+				S_SQ_TEX_WORD2_SRC_SEL_Z(tex->src_sel[2]) |
+				S_SQ_TEX_WORD2_SRC_SEL_W(tex->src_sel[3]);
 	bc->bytecode[id++] = 0;
 	return 0;
 }
@@ -1702,10 +1694,10 @@ static int r600_bytecode_cf_build(struct r600_bytecode *bc, struct r600_bytecode
 			S_SQ_CF_ALLOC_EXPORT_WORD0_ARRAY_BASE(cf->output.array_base) |
 			S_SQ_CF_ALLOC_EXPORT_WORD0_TYPE(cf->output.type);
 		bc->bytecode[id++] = S_SQ_CF_ALLOC_EXPORT_WORD1_BURST_COUNT(cf->output.burst_count - 1) |
-			S_SQ_CF_ALLOC_EXPORT_WORD1_SWIZ_SEL_X(cf->output.swizzle_x) |
-			S_SQ_CF_ALLOC_EXPORT_WORD1_SWIZ_SEL_Y(cf->output.swizzle_y) |
-			S_SQ_CF_ALLOC_EXPORT_WORD1_SWIZ_SEL_Z(cf->output.swizzle_z) |
-			S_SQ_CF_ALLOC_EXPORT_WORD1_SWIZ_SEL_W(cf->output.swizzle_w) |
+			S_SQ_CF_ALLOC_EXPORT_WORD1_SWIZ_SEL_X(cf->output.swizzle[0]) |
+			S_SQ_CF_ALLOC_EXPORT_WORD1_SWIZ_SEL_Y(cf->output.swizzle[1]) |
+			S_SQ_CF_ALLOC_EXPORT_WORD1_SWIZ_SEL_Z(cf->output.swizzle[2]) |
+			S_SQ_CF_ALLOC_EXPORT_WORD1_SWIZ_SEL_W(cf->output.swizzle[3]) |
 			S_SQ_CF_ALLOC_EXPORT_WORD1_BARRIER(cf->output.barrier) |
 			cf->output.inst |
 			S_SQ_CF_ALLOC_EXPORT_WORD1_END_OF_PROGRAM(cf->output.end_of_program);
@@ -2086,10 +2078,10 @@ void r600_bytecode_dump(struct r600_bytecode *bc)
 				fprintf(stderr, "TYPE:%X\n", cf->output.type);
 				id++;
 				fprintf(stderr, "%04d %08X EXPORT ", id, bc->bytecode[id]);
-				fprintf(stderr, "SWIZ_X:%X ", cf->output.swizzle_x);
-				fprintf(stderr, "SWIZ_Y:%X ", cf->output.swizzle_y);
-				fprintf(stderr, "SWIZ_Z:%X ", cf->output.swizzle_z);
-				fprintf(stderr, "SWIZ_W:%X ", cf->output.swizzle_w);
+				fprintf(stderr, "SWIZ_X:%X ", cf->output.swizzle[0]);
+				fprintf(stderr, "SWIZ_Y:%X ", cf->output.swizzle[1]);
+				fprintf(stderr, "SWIZ_Z:%X ", cf->output.swizzle[2]);
+				fprintf(stderr, "SWIZ_W:%X ", cf->output.swizzle[3]);
 				fprintf(stderr, "BARRIER:%X ", cf->output.barrier);
 				fprintf(stderr, "INST:0x%x ", EG_G_SQ_CF_ALLOC_EXPORT_WORD1_CF_INST(cf->output.inst));
 				fprintf(stderr, "BURST_COUNT:%d ", cf->output.burst_count);
@@ -2154,10 +2146,10 @@ void r600_bytecode_dump(struct r600_bytecode *bc)
 				fprintf(stderr, "TYPE:%X\n", cf->output.type);
 				id++;
 				fprintf(stderr, "%04d %08X EXPORT ", id, bc->bytecode[id]);
-				fprintf(stderr, "SWIZ_X:%X ", cf->output.swizzle_x);
-				fprintf(stderr, "SWIZ_Y:%X ", cf->output.swizzle_y);
-				fprintf(stderr, "SWIZ_Z:%X ", cf->output.swizzle_z);
-				fprintf(stderr, "SWIZ_W:%X ", cf->output.swizzle_w);
+				fprintf(stderr, "SWIZ_X:%X ", cf->output.swizzle[0]);
+				fprintf(stderr, "SWIZ_Y:%X ", cf->output.swizzle[1]);
+				fprintf(stderr, "SWIZ_Z:%X ", cf->output.swizzle[2]);
+				fprintf(stderr, "SWIZ_W:%X ", cf->output.swizzle[3]);
 				fprintf(stderr, "BARRIER:%X ", cf->output.barrier);
 				fprintf(stderr, "INST:0x%x ", R600_G_SQ_CF_ALLOC_EXPORT_WORD1_CF_INST(cf->output.inst));
 				fprintf(stderr, "BURST_COUNT:%d ", cf->output.burst_count);
@@ -2183,6 +2175,7 @@ void r600_bytecode_dump(struct r600_bytecode *bc)
 			default:
 				R600_ERR("Unknown instruction %0x\n", cf->inst);
 			}
+
 		}
 
 		id = cf->addr;
@@ -2243,10 +2236,10 @@ void r600_bytecode_dump(struct r600_bytecode *bc)
 			fprintf(stderr, "%04d %08X   ", id, bc->bytecode[id]);
 			fprintf(stderr, "DST(GPR:%d ", tex->dst_gpr);
 			fprintf(stderr, "REL:%d ", tex->dst_rel);
-			fprintf(stderr, "SEL_X:%d ", tex->dst_sel_x);
-			fprintf(stderr, "SEL_Y:%d ", tex->dst_sel_y);
-			fprintf(stderr, "SEL_Z:%d ", tex->dst_sel_z);
-			fprintf(stderr, "SEL_W:%d) ", tex->dst_sel_w);
+			fprintf(stderr, "SEL_X:%d ", tex->dst_sel[0]);
+			fprintf(stderr, "SEL_Y:%d ", tex->dst_sel[1]);
+			fprintf(stderr, "SEL_Z:%d ", tex->dst_sel[2]);
+			fprintf(stderr, "SEL_W:%d) ", tex->dst_sel[3]);
 			fprintf(stderr, "LOD_BIAS:%d ", tex->lod_bias);
 			fprintf(stderr, "COORD_TYPE_X:%d ", tex->coord_type_x);
 			fprintf(stderr, "COORD_TYPE_Y:%d ", tex->coord_type_y);
@@ -2258,10 +2251,10 @@ void r600_bytecode_dump(struct r600_bytecode *bc)
 			fprintf(stderr, "OFFSET_Y:%d ", tex->offset_y);
 			fprintf(stderr, "OFFSET_Z:%d ", tex->offset_z);
 			fprintf(stderr, "SAMPLER_ID:%d ", tex->sampler_id);
-			fprintf(stderr, "SRC(SEL_X:%d ", tex->src_sel_x);
-			fprintf(stderr, "SEL_Y:%d ", tex->src_sel_y);
-			fprintf(stderr, "SEL_Z:%d ", tex->src_sel_z);
-			fprintf(stderr, "SEL_W:%d)\n", tex->src_sel_w);
+			fprintf(stderr, "SRC(SEL_X:%d ", tex->src_sel[0]);
+			fprintf(stderr, "SEL_Y:%d ", tex->src_sel[1]);
+			fprintf(stderr, "SEL_Z:%d ", tex->src_sel[2]);
+			fprintf(stderr, "SEL_W:%d)\n", tex->src_sel[3]);
 			id++;
 			fprintf(stderr, "%04d %08X   \n", id, bc->bytecode[id]);
 			id++;
@@ -2276,16 +2269,16 @@ void r600_bytecode_dump(struct r600_bytecode *bc)
 			/* This assumes that no semantic fetches exist */
 			fprintf(stderr, "%04d %08X   ", id, bc->bytecode[id]);
 			fprintf(stderr, "SRC(GPR:%d ", vtx->src_gpr);
-			fprintf(stderr, "SEL_X:%d) ", vtx->src_sel_x);
+			fprintf(stderr, "SEL_X:%d) ", vtx->src_sel[0]);
 			if (bc->chip_class < CAYMAN)
 				fprintf(stderr, "MEGA_FETCH_COUNT:%d ", vtx->mega_fetch_count);
 			else
 				fprintf(stderr, "SEL_Y:%d) ", 0);
 			fprintf(stderr, "DST(GPR:%d ", vtx->dst_gpr);
-			fprintf(stderr, "SEL_X:%d ", vtx->dst_sel_x);
-			fprintf(stderr, "SEL_Y:%d ", vtx->dst_sel_y);
-			fprintf(stderr, "SEL_Z:%d ", vtx->dst_sel_z);
-			fprintf(stderr, "SEL_W:%d) ", vtx->dst_sel_w);
+			fprintf(stderr, "SEL_X:%d ", vtx->dst_sel[0]);
+			fprintf(stderr, "SEL_Y:%d ", vtx->dst_sel[1]);
+			fprintf(stderr, "SEL_Z:%d ", vtx->dst_sel[2]);
+			fprintf(stderr, "SEL_W:%d) ", vtx->dst_sel[3]);
 			fprintf(stderr, "USE_CONST_FIELDS:%d ", vtx->use_const_fields);
 			fprintf(stderr, "FORMAT(DATA:%d ", vtx->data_format);
 			fprintf(stderr, "NUM:%d ", vtx->num_format_all);
@@ -2520,13 +2513,13 @@ int r600_vertex_elements_build_fetch_shader(struct r600_pipe_context *rctx, stru
 		vtx.buffer_id = (ve->vbuffer_need_offset ? i : vbuffer_index) + fetch_resource_start;
 		vtx.fetch_type = elements[i].instance_divisor ? 1 : 0;
 		vtx.src_gpr = elements[i].instance_divisor > 1 ? i + 1 : 0;
-		vtx.src_sel_x = elements[i].instance_divisor ? 3 : 0;
+		vtx.src_sel[0] = elements[i].instance_divisor ? 3 : 0;
 		vtx.mega_fetch_count = 0x1F;
 		vtx.dst_gpr = i + 1;
-		vtx.dst_sel_x = desc->swizzle[0];
-		vtx.dst_sel_y = desc->swizzle[1];
-		vtx.dst_sel_z = desc->swizzle[2];
-		vtx.dst_sel_w = desc->swizzle[3];
+		vtx.dst_sel[0] = desc->swizzle[0];
+		vtx.dst_sel[1] = desc->swizzle[1];
+		vtx.dst_sel[2] = desc->swizzle[2];
+		vtx.dst_sel[3] = desc->swizzle[3];
 		vtx.data_format = format;
 		vtx.num_format_all = num_format;
 		vtx.format_comp_all = format_comp;

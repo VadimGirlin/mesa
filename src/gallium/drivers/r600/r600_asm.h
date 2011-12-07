@@ -64,10 +64,7 @@ struct r600_bytecode_tex {
 	unsigned			src_rel;
 	unsigned			dst_gpr;
 	unsigned			dst_rel;
-	unsigned			dst_sel_x;
-	unsigned			dst_sel_y;
-	unsigned			dst_sel_z;
-	unsigned			dst_sel_w;
+	unsigned			dst_sel[4];
 	unsigned			lod_bias;
 	unsigned			coord_type_x;
 	unsigned			coord_type_y;
@@ -77,10 +74,7 @@ struct r600_bytecode_tex {
 	unsigned			offset_y;
 	unsigned			offset_z;
 	unsigned			sampler_id;
-	unsigned			src_sel_x;
-	unsigned			src_sel_y;
-	unsigned			src_sel_z;
-	unsigned			src_sel_w;
+	unsigned			src_sel[4];
 };
 
 struct r600_bytecode_vtx {
@@ -89,13 +83,10 @@ struct r600_bytecode_vtx {
 	unsigned			fetch_type;
 	unsigned			buffer_id;
 	unsigned			src_gpr;
-	unsigned			src_sel_x;
+	unsigned			src_sel[1];
 	unsigned			mega_fetch_count;
 	unsigned			dst_gpr;
-	unsigned			dst_sel_x;
-	unsigned			dst_sel_y;
-	unsigned			dst_sel_z;
-	unsigned			dst_sel_w;
+	unsigned			dst_sel[4];
 	unsigned			use_const_fields;
 	unsigned			data_format;
 	unsigned			num_format_all;
@@ -115,10 +106,7 @@ struct r600_bytecode_output {
 
 	unsigned			elem_size;
 	unsigned			gpr;
-	unsigned			swizzle_x;
-	unsigned			swizzle_y;
-	unsigned			swizzle_z;
-	unsigned			swizzle_w;
+	unsigned			swizzle[4];
 	unsigned			burst_count;
 	unsigned			barrier;
 };
