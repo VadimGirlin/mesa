@@ -31,7 +31,9 @@
 struct vvec * vvec_create(unsigned initial_size)
 {
 	struct vvec * s = calloc(1, sizeof(struct vvec));
-	if (!s) return NULL;
+
+	if (!s)
+		return NULL;
 
 	vvec_set_size(s, initial_size);
 
@@ -45,10 +47,11 @@ struct vvec * vvec_create(unsigned initial_size)
 struct vvec * vvec_create_clean(unsigned initial_size)
 {
 	struct vvec * s = calloc(1, sizeof(struct vvec));
-	if (!s) return NULL;
+
+	if (!s)
+		return NULL;
 
 	s->count =  initial_size;
-
 	s->keys = calloc(s->count, sizeof(void*));
 
 	if (!s->keys) {
@@ -74,6 +77,7 @@ void vvec_clear(struct vvec * s)
 boolean vvec_contains(struct vvec * s, void * key)
 {
 	int q;
+
 	for(q=0; q<s->count;q++)
 		if (s->keys[q]==key)
 			return true;
@@ -91,6 +95,7 @@ void vvec_destroy(struct vvec * s)
 struct vvec * vvec_createcopy(struct vvec * s)
 {
 	struct vvec * v = vvec_create(s->count);
+
 	memcpy(v->keys, s->keys, s->count * sizeof(void*));
 	return v;
 }
@@ -98,7 +103,9 @@ struct vvec * vvec_createcopy(struct vvec * s)
 struct vset* vset_create(unsigned initial_size)
 {
 	struct vset * s = malloc(sizeof(struct vset));
-	if (!s) return NULL;
+
+	if (!s)
+		return NULL;
 	s->size=initial_size > 0 ? initial_size : 1;
 	s->count=0;
 	s->keys = malloc(s->size * sizeof(void *));
@@ -120,7 +127,9 @@ void vset_destroy(struct vset * s)
 int vset_get_pos(struct vset * s, void * key)
 {
 	int a = 0, b = s->count, c;
-	if (s->count<1) return 0;
+
+	if (s->count<1)
+		return 0;
 	do {
 		c = (a + b)>>1;
 		if (c == s->count || s->keys[c] == key)
@@ -135,26 +144,32 @@ int vset_get_pos(struct vset * s, void * key)
 
 boolean vset_contains(struct vset * s, void * key)
 {
-	if (!s->count) return false;
-	int p = vset_get_pos(s, key);
+	int p;
+
+	if (!s->count)
+		return false;
+	p = vset_get_pos(s, key);
 	return p < s->count && s->keys[p] == key;
 }
 
 boolean vset_containsvec(struct vset * s, struct vvec * v)
 {
 	int q;
-	if (!v) return true;
+
+	if (!v)
+		return true;
 	for(q=0;q<v->count;q++)
 		if (v->keys[q]!=NULL && !vset_contains(s,v->keys[q]))
 			return false;
-
 	return true;
 }
 
 boolean vset_containsset(struct vset * s, struct vset * c)
 {
 	int q;
-	if (!c) return true;
+
+	if (!c)
+		return true;
 	for(q=0;q<c->count;q++)
 		if (!vset_contains(s,c->keys[q]))
 			return false;
@@ -165,7 +180,9 @@ boolean vset_containsset(struct vset * s, struct vset * c)
 boolean vset_intersects(struct vset * s, struct vset * c)
 {
 	int q;
-	if (!c) return true;
+
+	if (!c)
+		return true;
 	for(q=0;q<c->count;q++)
 		if (vset_contains(s,c->keys[q]))
 			return true;
@@ -176,9 +193,10 @@ boolean vset_intersects(struct vset * s, struct vset * c)
 void vset_resize(struct vset * s)
 {
 	int new_size=s->size;
-	while (s->count > new_size) {
+
+	while (s->count > new_size)
 		new_size *= 2;
-	}
+
 	if (new_size!=s->size) {
 		s->size = new_size;
 		s->keys = realloc(s->keys, s->size * sizeof(void *));
@@ -189,6 +207,7 @@ void vset_resize(struct vset * s)
 boolean vset_add(struct vset * s, void * key)
 {
 	int p = vset_get_pos(s, key);
+
 	if (p == s->count || s->keys[p] != key) {
 		s->count++;
 		vset_resize(s);
@@ -202,9 +221,15 @@ boolean vset_add(struct vset * s, void * key)
 
 boolean vset_remove(struct vset * s, void * key)
 {
-	if (!s->count) return false;
-	int p = vset_get_pos(s, key);
-	if (p == s->count) return false;
+	int p;
+
+	if (!s->count)
+		return false;
+	p = vset_get_pos(s, key);
+
+	if (p == s->count)
+		return false;
+
 	if (s->keys[p] == key) {
 		if (s->count > p+1)
 			memmove(&s->keys[p], &s->keys[p+1], (s->count-1-p)*sizeof(void *));
@@ -233,6 +258,7 @@ boolean vset_removeset(struct vset * s, struct vset * from)
 {
 	int q;
 	boolean result = false;
+
 	for (q=0; q<from->count; q++)
 		result |= vset_remove(s,from->keys[q]);
 
@@ -243,6 +269,7 @@ boolean vset_removevec(struct vset * s, struct vvec * from)
 {
 	int q;
 	boolean result = false;
+
 	for (q=0; q<from->count; q++)
 		if (from->keys[q]!=NULL)
 			result |= vset_remove(s,from->keys[q]);
@@ -273,10 +300,14 @@ struct vset * vset_createcopy(struct vset * from)
 struct vmap* vmap_create(unsigned initial_size)
 {
 	struct vmap * s = malloc(sizeof(struct vmap));
-	if (!s) return NULL;
+
+	if (!s)
+		return NULL;
+
 	s->size=initial_size > 0 ? initial_size : 1;
 	s->count=0;
 	s->keys = malloc(s->size * sizeof(void *)*2);
+
 	if (!s->keys) {
 		free(s);
 		return NULL;
@@ -309,7 +340,9 @@ void vmap_copy(struct vmap * m, struct vmap * from)
 int vmap_get_pos(struct vmap * s, void * key)
 {
 	int a = 0, b = s->count, c;
-	if (s->count<1) return 0;
+
+	if (s->count<1)
+		return 0;
 	do {
 		c = (a + b)>>1;
 		if (c == s->count || s->keys[c*2] == key)
@@ -324,17 +357,20 @@ int vmap_get_pos(struct vmap * s, void * key)
 
 boolean vmap_contains(struct vmap * s, void * key)
 {
-	if (!s->count) return false;
-	int p = vmap_get_pos(s, key);
+	int p;
+	if (!s->count)
+		return false;
+	p = vmap_get_pos(s, key);
+
 	return p < s->count && s->keys[p*2] == key;
 }
 
 void vmap_resize(struct vmap * s)
 {
 	int new_size=s->size;
-	while (s->count > new_size) {
+	while (s->count > new_size)
 		new_size *= 2;
-	}
+
 	if (new_size!=s->size) {
 		s->size = new_size;
 		s->keys = realloc(s->keys, 2 * s->size * sizeof(void *));
@@ -346,6 +382,7 @@ boolean vmap_set(struct vmap * s, void * key, void * data)
 {
 	boolean result = false;
 	int p = vmap_get_pos(s, key);
+
 	if (p == s->count || s->keys[p*2] != key) {
 		s->count++;
 		vmap_resize(s);
@@ -360,8 +397,13 @@ boolean vmap_set(struct vmap * s, void * key, void * data)
 
 boolean vmap_get(struct vmap * s, void * key, void ** data)
 {
-	if (!s->count) return false;
-	int p = vmap_get_pos(s, key);
+	int p;
+
+	if (!s->count)
+		return false;
+
+	p = vmap_get_pos(s, key);
+
 	if (p < s->count && s->keys[p*2] == key) {
 		*data = s->keys[p*2+1];
 		return true;
@@ -371,9 +413,16 @@ boolean vmap_get(struct vmap * s, void * key, void ** data)
 
 boolean vmap_remove(struct vmap * s, void * key)
 {
-	if (!s->count) return false;
-	int p = vmap_get_pos(s, key);
-	if (p == s->count) return false;
+	int p;
+
+	if (!s->count)
+		return false;
+
+	p = vmap_get_pos(s, key);
+
+	if (p == s->count)
+		return false;
+
 	if (s->keys[p*2] == key) {
 		if (s->count > p+1)
 			memmove(&s->keys[p*2], &s->keys[(p+1)*2], (s->count-1-p)*sizeof(void *)*2);
@@ -394,7 +443,9 @@ struct vmap * vmap_createcopy(struct vmap * s) {
 struct vque* vque_create(unsigned initial_size)
 {
 	struct vque * s = malloc(sizeof(struct vque));
-	if (!s) return NULL;
+
+	if (!s)
+		return NULL;
 	s->size=initial_size > 0 ? initial_size : 1;
 	s->count=0;
 	s->keys = malloc(s->size * sizeof(void *)*2);
@@ -417,7 +468,9 @@ int vque_get_pos(struct vque * s, uintptr_t pri)
 {
 	void * key = (void*)pri;
 	int a = 0, b = s->count, c;
-	if (s->count<1) return 0;
+
+	if (s->count<1)
+		return 0;
 	do {
 		c = (a + b)>>1;
 		if (c == s->count)
@@ -435,9 +488,9 @@ int vque_get_pos(struct vque * s, uintptr_t pri)
 void vque_resize(struct vque * s)
 {
 	int new_size=s->size;
-	while (s->count > new_size) {
+	while (s->count > new_size)
 		new_size *= 2;
-	}
+
 	if (new_size!=s->size) {
 		s->size = new_size;
 		s->keys = realloc(s->keys, s->size * sizeof(void *)*2);
@@ -449,18 +502,25 @@ void vque_enqueue(struct vque * s,  uintptr_t  pri, void * data)
 {
 	void * key = (void*)pri;
 	int p = vque_get_pos(s, pri);
+
 	s->count++;
 	vque_resize(s);
+
 	if (s->count > p+1)
 		memmove(&s->keys[(p+1)*2], &s->keys[p*2], (s->count-1-p)*sizeof(void *)*2);
+
 	s->keys[p*2] = key;
 	s->keys[p*2+1] = data;
 }
 
 boolean vque_dequeue(struct vque * s, void ** data)
 {
-	if (!s->count) return false;
-	int p = --s->count;
+	int p;
+
+	if (!s->count)
+		return false;
+
+	p = --s->count;
 	*data = s->keys[p*2+1];
 	return true;
 }

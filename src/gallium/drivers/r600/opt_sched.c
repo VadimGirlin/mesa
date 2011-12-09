@@ -21,9 +21,7 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
 #include "opt_core.h"
-
 
 static void clear_interferences(struct var_desc * v)
 {
@@ -44,6 +42,7 @@ static void update_interferences(struct vset * live)
 
 	for (q=0;q<live->count; q++) {
 		struct var_desc * v = live->keys[q];
+
 		vset_addset(v->interferences, live);
 	}
 }
@@ -53,18 +52,14 @@ static void update_interferences(struct vset * live)
 static void gs_enqueue_blocks(struct shader_info * info, struct vque * blocks, struct ast_node * node)
 {
 	if (node->type == NT_OP || node->type == NT_REGION || node->type == NT_IF
-		|| node->subtype == NST_ALU_GROUP) {
+			|| node->subtype == NST_ALU_GROUP) {
 
 		node->parent->child = NULL;
 
-		if (!(node->flags & AF_DEAD)) {
+		if (!(node->flags & AF_DEAD))
 			vque_enqueue(blocks, node->max_prio, node);
-		}
-		else {
+		else
 			destroy_ast(node);
-		}
-
-
 	} else {
 
 		if (node->rest)
@@ -77,7 +72,6 @@ static void gs_enqueue_blocks(struct shader_info * info, struct vque * blocks, s
 
 }
 
-
 /* recreate ast list from blocks queue */
 
 /* created alu clauses are just groups of subsequent alu instructions,
@@ -88,7 +82,6 @@ static struct ast_node * gs_create_list(struct shader_info * info, struct vque *
 	int q;
 	struct ast_node * list = NULL, * clause = NULL, * lc;
 	boolean last_alu = false;
-
 	unsigned last_alu_prio=0, nalu = 0;
 
 	for (q=0; q<blocks->count; q++) {
@@ -99,23 +92,20 @@ static struct ast_node * gs_create_list(struct shader_info * info, struct vque *
 		dump_node(info, n, 0);
 
 		if (alu) {
-
 			if (n->subtype == NST_ALU_INST) {
 				boolean new_group = (n->min_prio!=last_alu_prio) || (nalu==info->max_slots-1);
 
 				if (new_group) {
 					n->alu->last = 1;
 					nalu=0;
-				} else {
+				} else
 					n->alu->last = 0;
-				}
 
 				last_alu_prio = n->min_prio;
 				nalu++;
 
-			} else {
+			} else
 				last_alu_prio = 0;
-			}
 
 			if (!last_alu) {
 
@@ -128,18 +118,14 @@ static struct ast_node * gs_create_list(struct shader_info * info, struct vque *
 					list->parent = create_node(NT_LIST);
 					list->parent->rest = list;
 					list = list->parent;
-				} else {
+				} else
 					list = create_node(NT_LIST);
-				}
 
 				list->child = clause;
-
 				lc = create_node(NT_LIST);
-
 			} else {
 				lc->parent = create_node(NT_LIST);
 				lc->parent->rest = lc;
-
 				lc = lc->parent;
 			}
 
@@ -154,19 +140,16 @@ static struct ast_node * gs_create_list(struct shader_info * info, struct vque *
 				list->parent = create_node(NT_LIST);
 				list->parent->rest = list;
 				list = list->parent;
-			} else {
+			} else
 				list = create_node(NT_LIST);
-			}
 
 			lc = list;
-
 		}
 
 		lc->child = n;
 		n->parent = lc;
 
 		last_alu = alu;
-
 	}
 
 	if (last_alu) {
@@ -181,12 +164,12 @@ static void gs_schedule_node(struct shader_info * info, struct ast_node * node)
 {
 	struct vque * blocks = vque_create(16);
 	struct ast_node * list;
+	int q;
 
 	gs_enqueue_blocks(info, blocks, node);
 
 	R600_DUMP("\n##QUEUED BLOCKS:\n");
 
-	int q;
 	for (q=blocks->count-1; q>=0; q--) {
 		struct ast_node * n = blocks->keys[q*2+1];
 		dump_node(info, n, 0);
@@ -230,14 +213,11 @@ static void gs_collect_vars_usage(struct ast_node * node)
 		vset_addset(node->vars_used, node->phi->vars_used);
 	}
 
-
 	if (node->ins)
 		vset_addvec(node->vars_used, node->ins);
 
 	if (node->flow_dep)
 		vset_add(node->vars_used, node->flow_dep);
-
-
 }
 
 
@@ -257,11 +237,8 @@ static enum node_subtype gs_prio_get_node_subtype(struct ast_node * node)
 	case NST_ALU_GROUP:
 		return NST_ALU_INST;
 
-
-
 	default:
 		return 0;
-
 	}
 }
 
@@ -296,19 +273,17 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		int q;
 		for (q=0; q<node->outs->count; q++) {
 			struct var_desc * v = node->outs->keys[q];
-			if (v && !(v->flags & VF_DEAD)) {
-				if (v->prio > pri) {
-					pri = v->prio;
-				}
-			}
+			if (v && !(v->flags & VF_DEAD) && (v->prio > pri))
+				pri = v->prio;
 		}
 	}
 
 	if (node->type != NT_LIST) {
 		if (node->subtype == NST_TEX_INST || node->subtype == NST_VTX_INST) {
-			pri = (pri-pri%ANP_PRIO_BLOCKSTEP) + ANP_PRIO_BLOCKSTEP;
+			unsigned lvl;
 
-			unsigned lvl = pri/ANP_PRIO_BLOCKSTEP;
+			pri = (pri-pri%ANP_PRIO_BLOCKSTEP) + ANP_PRIO_BLOCKSTEP;
+			lvl = pri/ANP_PRIO_BLOCKSTEP;
 
 			do {
 				void * d = 0;
@@ -334,12 +309,8 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		int q;
 		for (q=0; q<node->outs->count; q++) {
 			struct var_desc * v = node->outs->keys[q];
-			if (v && !(v->flags & VF_DEAD)) {
-				if (v->prio < node->min_prio) {
-					v->prio = node->min_prio;
-				}
-
-			}
+			if (v && !(v->flags & VF_DEAD) && (v->prio < node->min_prio))
+				v->prio = node->min_prio;
 		}
 	}
 
@@ -347,13 +318,8 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		int q;
 		for (q=0; q<node->ins->count; q++) {
 			struct var_desc * v = node->ins->keys[q];
-			if (v && !(v->flags & VF_DEAD)) {
-
-				if (v->prio < pri) {
-					v->prio = pri;
-
-				}
-			}
+			if (v && !(v->flags & VF_DEAD) && (v->prio < pri))
+				v->prio = pri;
 		}
 	}
 
@@ -363,38 +329,26 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		gs_calc_min_prio(info, node->loop_phi);
 	}
 
-	if (node->p_split) {
+	if (node->p_split)
 		gs_calc_min_prio(info, node->p_split);
-	}
 
 	if (node->vars_used
-			&& (node->type == NT_REGION
-					|| node->type == NT_IF
-					|| node->subtype == NST_ALU_GROUP
-				)) {
+			&& (node->type == NT_REGION	|| node->type == NT_IF || node->subtype == NST_ALU_GROUP)) {
 		int q;
 
 		node->min_prio = max_child_prio;
 
-
 		for (q=0; q<node->vars_used->count; q++) {
 			struct var_desc * v = node->vars_used->keys[q];
-
 			if (v->prio < node->min_prio)
 				v->prio = node->min_prio;
-
 		}
 	}
 
 	if (node->flow_dep) {
 		struct var_desc * v = node->flow_dep;
-		if (v && !(v->flags & VF_DEAD)) {
-
-			if (v->prio < node->min_prio) {
-				v->prio = node->min_prio;
-
-			}
-		}
+		if (v && !(v->flags & VF_DEAD) && (v->prio < node->min_prio))
+			v->prio = node->min_prio;
 	}
 
 	return MAX2(max_child_prio, node->min_prio);
@@ -407,11 +361,8 @@ static void gs_calc_max_prio(struct shader_info * info, struct ast_node * node)
 	if (node->type != NT_LIST) {
 
 		enum node_subtype st = gs_prio_get_node_subtype(node);
-
 		boolean alu = (st == NST_ALU_INST);
 		boolean fetch = (st == NST_TEX_INST || st == NST_VTX_INST);
-
-
 		boolean fetch_dep = false;
 
 		if (node->p_split)
@@ -419,13 +370,8 @@ static void gs_calc_max_prio(struct shader_info * info, struct ast_node * node)
 
 		if (node->flow_dep) {
 			struct var_desc * v = node->flow_dep;
-			if (v && !(v->flags & VF_DEAD)) {
-
-				if (v->prio < pri) {
-					pri = v->prio;
-				}
-			}
-
+			if (v && !(v->flags & VF_DEAD) && (v->prio < pri))
+				pri = v->prio;
 		}
 
 		if (node->ins) {
@@ -433,28 +379,18 @@ static void gs_calc_max_prio(struct shader_info * info, struct ast_node * node)
 			for (q=0; q<node->ins->count; q++) {
 				struct var_desc * v = node->ins->keys[q];
 				if (v && !(v->flags & VF_DEAD)) {
-
-					if (v->prio < pri) {
+					if (v->prio < pri)
 						pri = v->prio;
-					}
-
 					fetch_dep |= v->fetch_dep;
 				}
 			}
-		} else if (node->vars_used
-				&& (node->type == NT_REGION
-						|| node->type == NT_IF
-						|| node->subtype == NST_ALU_GROUP
-				)) {
+		} else if (node->vars_used && (node->type == NT_REGION || node->type == NT_IF
+						|| node->subtype == NST_ALU_GROUP)) {
 			int q;
 			for (q=0; q<node->vars_used->count; q++) {
 				struct var_desc * v = node->vars_used->keys[q];
-				if (v && !(v->flags & VF_DEAD )) {
-
-					if (v->prio < pri) {
-						pri = v->prio;
-					}
-				}
+				if (v && !(v->flags & VF_DEAD ) && (v->prio < pri))
+					pri = v->prio;
 			}
 		}
 
@@ -462,11 +398,8 @@ static void gs_calc_max_prio(struct shader_info * info, struct ast_node * node)
 			pri = node->min_prio;
 			if (fetch)
 				fetch_dep = true;
-		}
-		else {
+		} else
 			pri -= 1;
-		}
-
 
 		node->max_prio = pri;
 
@@ -475,18 +408,14 @@ static void gs_calc_max_prio(struct shader_info * info, struct ast_node * node)
 			for (q=0; q<node->outs->count; q++) {
 				struct var_desc * v = node->outs->keys[q];
 				if (v && !(v->flags & VF_DEAD )) {
-
-						v->prio = pri;
-						v->fetch_dep = fetch_dep;
-
+					v->prio = pri;
+					v->fetch_dep = fetch_dep;
 				}
 			}
 		}
 
 		if (node->p_split_outs)
 			gs_calc_max_prio(info, node->p_split_outs);
-
-
 	}
 
 	if (node->child)
@@ -494,7 +423,6 @@ static void gs_calc_max_prio(struct shader_info * info, struct ast_node * node)
 
 	if (node->rest)
 		gs_calc_max_prio(info, node->rest);
-
 }
 
 void gs_schedule(struct shader_info * info)
@@ -514,9 +442,6 @@ void gs_schedule(struct shader_info * info)
 	gs_schedule_node(info, info->root);
 }
 
-
-
-
 /* create ins and outs vectors for the alu instructions group */
 static void create_group_iovecs(struct ast_node * g)
 {
@@ -535,7 +460,6 @@ static void create_group_iovecs(struct ast_node * g)
 		g->outs = vvec_createcopy(g->p_split_outs->outs);
 
 		return;
-
 	}
 
 	if (g->ins == NULL)
@@ -569,7 +493,6 @@ static void create_group_iovecs(struct ast_node * g)
 
 	while(oc<g->outs->count)
 		g->outs->keys[oc++] = NULL;
-
 }
 
 /* updating use counts map for variables */
@@ -581,7 +504,7 @@ static void update_counts(struct vmap * uc, struct vvec * vars, int delta)
 {
 	int q;
 
-	if (vars == NULL)
+	if (!vars)
 		return;
 
 	for (q=0; q<vars->count; q++) {
@@ -589,9 +512,9 @@ static void update_counts(struct vmap * uc, struct vvec * vars, int delta)
 		if (v) {
 			void *d;
 
-			if (VMAP_GET(uc, v, &d)) {
+			if (VMAP_GET(uc, v, &d))
 				d = (void*)(((intptr_t)d) + delta);
-			} else
+			else
 				d = (void*)(intptr_t)delta;
 
 			assert(((intptr_t)d)>=0);
@@ -712,9 +635,9 @@ static boolean sched_cbs_reserve_cpair(struct scheduler_ctx * ctx, int cpair)
 {
 	int q;
 	for (q=0;q<2;q++) {
-		if (ctx->cbs.cpair[q]==cpair) {
+		if (ctx->cbs.cpair[q]==cpair)
 			return true;
-		} else if (ctx->cbs.cpair[q]==0) {
+		else if (ctx->cbs.cpair[q]==0) {
 			ctx->cbs.cpair[q] = cpair;
 			ctx->cpair_mdf[ctx->cpair_mdf_count++] = q;
 			return true;
@@ -766,7 +689,6 @@ static boolean sched_cbs_try_slot(struct scheduler_ctx * ctx, struct ast_node * 
 		ctx->cpair_mdf_count = 0;
 
 		if (n->const_ins_count) {
-
 			if (scalar && n->const_ins_count>2)
 				return false;
 
@@ -789,16 +711,14 @@ static boolean sched_cbs_try_slot(struct scheduler_ctx * ctx, struct ast_node * 
 		}
 	}
 
-
 	if (res & CBS_RES_GPR) {
+		void * vv0 = NULL, * vv;
+
 		assert(!n->alu->bank_swizzle_force || n->alu->bank_swizzle == bs);
 		assert(bs < (scalar ? 4:6));
 
-
 		/* reset gpr rollback data */
 		ctx->cgpr_mdf_count = 0;
-
-		void * vv0 = NULL, * vv;
 
 		for (q=0; q<n->ins->count; q++) {
 			struct var_desc * v = n->ins->keys[q];
@@ -817,9 +737,8 @@ static boolean sched_cbs_try_slot(struct scheduler_ctx * ctx, struct ast_node * 
 					swz = sched_cbs_vec(bs, q);
 					if (q==0)
 						vv0 = vv;
-					else if (q==1 && vv==vv0) {
+					else if (q==1 && vv==vv0)
 						continue;
-					}
 				}
 
 				int chan = KEY_CHAN(v->color);
@@ -841,11 +760,9 @@ static boolean sched_cbs_init(struct scheduler_ctx * ctx)
 
 	for (q=0; q<ctx->info->max_slots; q++) {
 		struct ast_node * n = ctx->slots[ctx->curgroup][q];
-		if (n) {
-			if (!sched_cbs_try_slot(ctx, n, n->alu->bank_swizzle, q==4, CBS_RES_ALL)) {
-				assert(0);
-				return false;
-			}
+		if (n && !sched_cbs_try_slot(ctx, n, n->alu->bank_swizzle, q==4, CBS_RES_ALL)) {
+			assert(0);
+			return false;
 		}
 	}
 	return true;
@@ -870,9 +787,8 @@ static boolean sched_cbs_add_slot(struct scheduler_ctx * ctx, int curgroup, int 
 
 	/* fast path - try to find bs for the new slot only */
 	if (n->alu->bank_swizzle_force) {
-		if (sched_cbs_try_slot(ctx, n, n->alu->bank_swizzle, scalar, CBS_RES_GPR)) {
+		if (sched_cbs_try_slot(ctx, n, n->alu->bank_swizzle, scalar, CBS_RES_GPR))
 			result = true;
-		}
 	} else {
 		for (bs=0; bs<swz_cnt; bs++) {
 			if (sched_cbs_try_slot(ctx, n, bs, scalar, CBS_RES_GPR)) {
@@ -968,10 +884,7 @@ static boolean sched_cbs_add_slot(struct scheduler_ctx * ctx, int curgroup, int 
 		}
 		return true;
 	} else {
-		/* restore partial bank swizzle data */
-//		sched_cbs_reset(ctx, CBS_RES_ALL);
 		ctx->cbs.bs_slots[slot] = NULL;
-//		sched_cbs_init(ctx);
 		return false;
 	}
 }
@@ -979,7 +892,6 @@ static boolean sched_cbs_add_slot(struct scheduler_ctx * ctx, int curgroup, int 
 static void sched_check_chunks_types(struct vset * vars, struct vset * globals)
 {
 	int q;
-
 	struct vset * processed_chunks = vset_create(16);
 
 	for (q=0; q<vars->count; q++) {
@@ -1290,17 +1202,12 @@ static boolean sched_alloc_kcache(struct scheduler_ctx * ctx)
 
 	for (q=0; q<max_slots; q++) {
 		struct ast_node * c = ctx->slots[ctx->curgroup][q];
-		if (c)	{
+		if (c && c->const_ins_count) {
+			for (w=0; w<c->ins->count; w++) {
+				int sel = c->alu->src[w].sel;
 
-			if (c->const_ins_count) {
-				for (w=0; w<c->ins->count; w++) {
-					int sel = c->alu->src[w].sel;
-
-					if (sel>=512) {
-						if (!sched_alloc_kcache_const(ctx, sel-512))
-							return false;
-					}
-				}
+				if (sel>=512 && !sched_alloc_kcache_const(ctx, sel-512))
+					return false;
 			}
 		}
 	}
@@ -1330,7 +1237,6 @@ static void sched_set_split(struct scheduler_ctx * ctx)
 static void sched_check_clause_limits(struct scheduler_ctx * ctx)
 {
 	boolean split = false;
-
 	int literal_slot_count = ctx->nliteral ? ((ctx->nliteral+1)>>1) : 0;
 
 	if (!sched_alloc_kcache(ctx))
@@ -1343,10 +1249,8 @@ static void sched_check_clause_limits(struct scheduler_ctx * ctx)
 
 	if (split) {
 		sched_set_split(ctx);
-
 		ctx->kc_sets_count = 0;
 		ctx->alu_slot_count = ctx->group_inst_count + literal_slot_count;
-
 		sched_alloc_kcache(ctx);
 	}
 }
@@ -1441,9 +1345,8 @@ static boolean sched_check_interferences(struct scheduler_ctx * ctx)
 						print_reg(v2->color);
 						R600_DUMP("\n");
 						assert(0);
-					} else {
+					} else
 						VMAP_REMOVE(ctx->reg_map, v->color);
-					}
 				}
 			}
 		}
@@ -1471,9 +1374,8 @@ static boolean sched_check_interferences(struct scheduler_ctx * ctx)
 					/* skip locals - they will be recolored later,
 					 * when we will schedule their definitions,
 					 * so we'll have no interference */
-					if (vset_contains(ctx->locals, v)) {
+					if (vset_contains(ctx->locals, v))
 						continue;
-					}
 
 					R600_DUMP("checking intf ");
 					print_var(v);
@@ -1481,7 +1383,6 @@ static boolean sched_check_interferences(struct scheduler_ctx * ctx)
 					print_reg(v->color);
 
 					if (VMAP_GET(ctx->reg_map, v->color, &v2)) {
-
 						R600_DUMP("  from regmap : ");
 						print_var(v2);
 
@@ -1526,9 +1427,7 @@ static boolean sched_check_interferences(struct scheduler_ctx * ctx)
 					ctx->slots[ctx->curgroup][j] = NULL;
 
 					ctx->free_slots |= (1<<j);
-
 					inst_cnt--;
-
 					ctx->restart = true;
 					break;
 				}
@@ -1537,7 +1436,6 @@ static boolean sched_check_interferences(struct scheduler_ctx * ctx)
 	}
 
 	if (intf4) {
-
 		R600_DUMP("4slots interference : \n");
 		dump_node(ctx->info, grp4, 0);
 
@@ -1554,22 +1452,19 @@ static boolean sched_check_interferences(struct scheduler_ctx * ctx)
 			if (c)	{
 				ctx->slots[ctx->curgroup][j] = NULL;
 				inst_cnt--;
-			} else {
+			} else
 				assert(0);
-			}
 		}
 
 		ctx->restart = true;
 	}
 
 
-	if (inst_cnt==0) {
+	if (inst_cnt == 0) {
 		R600_DUMP("empty group - restarting\n");
 
 		++ctx->empty_count;
 
-		/* 5 iterations in a row without any result is probably enough
-		 * to start thinking that we are in infinite loop */
 		assert(ctx->empty_count<5);
 
 		/* fail to optimize the shader and fallback to the original bytecode */
@@ -1587,7 +1482,7 @@ static boolean sched_check_interferences(struct scheduler_ctx * ctx)
 
 
 /* schedule alu clause */
-/* probably could be described as a bottom-up greedy cycle-based list scheduler */
+/* probably could be described as a bottom-up greedy cycle scheduler */
 static boolean post_schedule_alu(struct shader_info *info, struct ast_node * clause_node)
 {
 	struct scheduler_ctx ctx;
@@ -1596,7 +1491,8 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 	struct ast_node * c;
 	boolean result = true;
 
-	if (!clause_node->child) return true;
+	if (!clause_node->child)
+		return true;
 
 	memset(&ctx, 0, sizeof(ctx));
 
@@ -1611,14 +1507,11 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 	ctx.live = vset_createcopy(clause_node->vars_live_after);
 	ctx.clause_node = clause_node;
 
-	vset_addset(ctx.globals, clause_node->vars_live_after);
-
-	sched_map_live_outs(&ctx);
-
 	memset(ctx.slots, 0, 2*5*sizeof(void*));
 
+	vset_addset(ctx.globals, clause_node->vars_live_after);
+	sched_map_live_outs(&ctx);
 	sched_select_live_instructions(&ctx);
-
 	sched_check_chunks_types(clause_node->vars_defined, ctx.globals);
 
 	ctx.count = ctx.instructions->count;
@@ -1628,14 +1521,8 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 	for (i=0; i<clause_node->vars_defined->count; i++) {
 		struct var_desc *v = clause_node->vars_defined->keys[i];
 
-		if ((v->chunk && !(v->chunk->flags & ACF_LOCAL)) || vset_contains(ctx.globals, v)) {
-
-		} else  {
-
-			if (vset_add(ctx.locals, v)) {
-				sched_init_local_var(v);
-			}
-		}
+		if (!((v->chunk && !(v->chunk->flags & ACF_LOCAL)) || vset_contains(ctx.globals, v)) && vset_add(ctx.locals, v))
+			sched_init_local_var(v);
 	}
 
 	R600_DUMP( "### %d instructions selected\n", ctx.count);
@@ -1659,10 +1546,9 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 				if (ctx.slots[ctx.curgroup][q]) {
 					int r = r600_bytecode_alu_nliterals(&info->shader->bc, ctx.slots[ctx.curgroup][q]->alu, ctx.literal, &ctx.nliteral);
 					assert(!r);
-				} else {
+				} else
 					/* update discarded slots for bs check */
 					ctx.cbs.bs_slots[q] = NULL;
-				}
 			}
 		} else {
 			memset(ctx.cbs.bs_slots, 0, 5*sizeof(void*));
@@ -1693,12 +1579,13 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 		/* selecting in bottom-up order */
 		for (i=ctx.ready_inst->count-1; i>=0; i--) {
 			int index = (intptr_t)ctx.ready_inst->keys[i*2];
+			boolean kill;
 
 			n = ctx.ready_inst->keys[i*2+1];
 
 			memset(ctx.slots[2], 0, 5*sizeof(void*));
 
-			boolean kill = n->alu && is_alu_kill_inst(&info->shader->bc, n->alu);
+			kill = n->alu && is_alu_kill_inst(&info->shader->bc, n->alu);
 
 			/* don't mix kill instructions with other instructions in the same group */
 			/* FIXME: probably it's not required */
@@ -1713,21 +1600,18 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 			if (n->type == NT_GROUP) {
 				c = n->child;
 
-				if  (~ctx.free_slots & 0x0F)
+				if (~ctx.free_slots & 0x0F)
 					continue;
 
 				j = 0;
-
 				dump_node(info, n, 0);
 
 				while (c && c->child) {
 					ctx.slots[2][j++] = c->child;
 					c = c->rest;
-
 				}
 
 				ctx.idx[0] = index;
-
 				assert (j==4);
 
 			} else { /* single instruction */
@@ -1766,9 +1650,8 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 				}
 
 				/* try assign trans slot */
-				if ((slot==-1) && (n->alu_allowed_slots_type & AT_TRANS))
-					if (ctx.free_slots & 0x10)
-						slot = 4;
+				if ((slot==-1) && (n->alu_allowed_slots_type & AT_TRANS) && (ctx.free_slots & 0x10))
+					slot = 4;
 
 				/* unable to find slot, skip instruction */
 				if (slot==-1) {
@@ -1855,9 +1738,8 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 
 		sched_check_interferences(&ctx);
 
-		if (ctx.restart) {
+		if (ctx.restart)
 			continue;
-		}
 
 		ctx.empty_count=0;
 
@@ -1876,7 +1758,6 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 		}
 
 		sched_process_selected_group(&ctx);
-
 		sched_check_clause_limits(&ctx);
 
 		R600_DUMP( " updating interferences :");
@@ -1884,7 +1765,6 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 		R600_DUMP("\n");
 
 		update_interferences(ctx.live);
-
 		sched_add_group(&ctx);
 
 		ctx.curgroup = !ctx.curgroup;
@@ -1901,8 +1781,6 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 	vset_destroy(ctx.globals);
 	vset_destroy(ctx.locals);
 
-	/* destroy original clause contents -
-	 * now it contains dead instructions only */
 	destroy_ast(clause_node->child);
 
 	clause_node->child = ctx.out_list;
@@ -1926,14 +1804,10 @@ static boolean post_schedule_node(struct shader_info *info, struct ast_node * no
 				return false;
 	}
 
-
 	return true;
-
 }
 
 boolean post_schedule(struct shader_info *info)
 {
 	return post_schedule_node(info, info->root);
 }
-
-

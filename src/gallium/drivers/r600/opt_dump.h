@@ -36,7 +36,7 @@ static inline void get_dump_level()
 #ifdef DEBUG
 		_r600_opt_dump_level = debug_get_num_option("R600_OPT_DUMP",1);
 #else
-		_r600_opt_dump_level = debug_get_num_option("R600_OPT_DUMP",0);
+	_r600_opt_dump_level = debug_get_num_option("R600_OPT_DUMP",0);
 
 	if (_r600_opt_dump_level > R600_OPT_DUMP_LEVEL_SHADERS)
 		_r600_opt_dump_level = R600_OPT_DUMP_LEVEL_SHADERS;
@@ -50,15 +50,15 @@ static inline boolean check_dump_level(int loglevel)
 
 #ifdef DEBUG
 #define R600_DUMP(fmt, args...) \
-	do { \
-		if (check_dump_level(R600_OPT_DUMP_LEVEL_DEBUG)) \
+		do { \
+			if (check_dump_level(R600_OPT_DUMP_LEVEL_DEBUG)) \
 			fprintf(stderr, fmt, ##args); \
-	} while(0)
+		} while(0)
 #define R600_DUMP_CALL(f) \
-	do { \
-		if (check_dump_level(R600_OPT_DUMP_LEVEL_DEBUG)) \
+		do { \
+			if (check_dump_level(R600_OPT_DUMP_LEVEL_DEBUG)) \
 			f; \
-	} while(0)
+		} while(0)
 #else
 #define R600_DUMP(fmt, args...)
 #define R600_DUMP_CALL(f)

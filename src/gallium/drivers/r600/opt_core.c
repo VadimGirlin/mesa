@@ -76,32 +76,15 @@ static int is_alu_replicate_inst(struct r600_bytecode *bc, struct r600_bytecode_
 
 static int is_alu_four_slots_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
-	switch (bc->chip_class) {
-	case R600:
-	case R700:
-		return !alu->is_op3 && (
-				alu->inst == V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_CUBE ||
-				alu->inst == V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_DOT4 ||
-				alu->inst == V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_DOT4_IEEE ||
-				alu->inst == V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MAX4);
-	case EVERGREEN:
-	case CAYMAN:
-	default:
-		return !alu->is_op3 && (
-				alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_CUBE ||
-				alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_DOT4 ||
-				alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_DOT4_IEEE ||
-				alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MAX4 ||
-				alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_XY ||
-				alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_ZW
-		);
-	}
+	return r600_is_alu_reduction_inst(bc, alu) ||
+			(bc->chip_class >= EVERGREEN &&
+					(alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_XY ||
+							alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_ZW));
 }
 
 static struct var_desc * create_var()
 {
 	struct var_desc * v = calloc(1,sizeof(struct var_desc));
-	assert(v);
 	v->reg.reg = -1;
 	v->reg.chan = -1;
 	return v;
@@ -110,11 +93,10 @@ static struct var_desc * create_var()
 static struct var_desc * get_var(struct shader_info * info, int reg, int chan, int index)
 {
 	uintptr_t key = (index<<10) + (reg<<2) + (chan + 1);
+	struct var_desc * v;
 
 	if (chan==-1)
 		key |= REG_TEMP;
-
-	struct var_desc * v;
 
 	if (!VMAP_GET(info->vars, key, &v)) {
 		v = create_var();
@@ -128,7 +110,6 @@ static struct var_desc * get_var(struct shader_info * info, int reg, int chan, i
 		VMAP_SET(info->vars, key, v);
 	}
 
-	assert(v);
 	return v;
 }
 
@@ -143,19 +124,14 @@ static struct var_desc * create_temp_var(struct shader_info * info)
 	t->reg.chan = -1;
 
 	VMAP_SET(info->vars, key, t);
-
 	info->next_temp++;
-
 	return t;
 }
 
 struct ast_node * create_node(enum node_type type)
 {
 	struct ast_node * node = calloc(1,sizeof(struct ast_node));
-	if (!node) return NULL;
-
 	node->type = type;
-
 	return node;
 }
 
@@ -237,9 +213,9 @@ static boolean parse_cf_tex(struct shader_info * info, struct ast_node * node, s
 		tn->flags |= AF_REG_CONSTRAINT;
 
 		if (tex->inst == SQ_TEX_INST_SET_GRADIENTS_H ||
-				tex->inst == SQ_TEX_INST_SET_GRADIENTS_V) {
+				tex->inst == SQ_TEX_INST_SET_GRADIENTS_V)
 			tn->flags |= AF_KEEP_ALIVE;
-		}
+
 	}
 	return true;
 }
@@ -271,13 +247,10 @@ static boolean parse_cf_vtx(struct shader_info * info, struct ast_node * node, s
 		tn->parent = cl;
 
 		tn->vtx = vtx;
-
 		tn->ins = vvec_create(1);
-
 		tn->ins->keys[0] = vtx->src_sel[0] < 4 ? get_var(info, vtx->src_gpr, vtx->src_sel[0], 0) : NULL;
 
 		tn->outs = vvec_create(4);
-
 		for (q=0; q<4; q++)
 			tn->outs->keys[q] = vtx->dst_sel[q] < 4 ? get_var(info, vtx->dst_gpr, vtx->dst_sel[q], 0) : NULL;
 
@@ -301,7 +274,6 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 	memset(slots,0, 5 * 2 * sizeof(void*));
 
 	cl = create_node(NT_LIST);
-
 	node->child=cl;
 	cl->parent=node;
 
@@ -312,7 +284,6 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 		boolean grouped;
 
 		an->subtype = NST_ALU_INST;
-
 		grouped = is_alu_four_slots_inst(&info->shader->bc, alu);
 
 		if (grouped) {
@@ -376,16 +347,10 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 			trans = 0;
 
 		if (trans) {
-			if (slots[cur_slots][4]) {
-				assert(0); /* ALU.Trans has already been allocated. */
-				//				return -1;
-			}
+			assert(!slots[cur_slots][4]); /* check if ALU.Trans has already been allocated. */
 			slots[cur_slots][4] = an;
 		} else {
-			if (slots[cur_slots][chan]) {
-				assert(0); /* ALU.chan has already been allocated. */
-				//				return -1;
-			}
+			assert(!slots[cur_slots][chan]); /* check if ALU.chan has already been allocated. */
 			slots[cur_slots][chan] = an;
 		}
 
@@ -395,25 +360,21 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 			an->outs = vvec_create(3);
 			an->outs->keys[1] = get_var(info, REG_PR, 0, 0);
 			an->outs->keys[2] = get_var(info, REG_AM, 0, 0);
-		} else  {
+		} else
 			an->outs = vvec_create(1);
-		}
 
 		boolean write = (alu->dst.write==1) || alu->is_op3;
 
-		if (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOVA_INT){
+		if (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOVA_INT)
 			an->outs->keys[0] = get_var(info, REG_AR, 0, 0);
-		} else {
+		else
 			an->outs->keys[0] = (alu->dst.sel<128 && write) ? get_var(info, alu->dst.sel, alu->dst.chan, 0) : NULL;
-
-		}
 
 		if (alu->dst.rel)
 			return 0;
 
-		if (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOV) {
+		if (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOV)
 			an->flags |= AF_COPY_HINT;
-		}
 
 		if (alu->dst.clamp)
 			an->flags |= AF_ALU_CLAMP_DST;
@@ -423,17 +384,12 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 
 			if (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_XY ||
 					alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_ZW ||
-					alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_CUBE) {
-
+					alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_CUBE)
 				an->flags |= AF_CHAN_CONSTRAINT;
-			}
-		} else if (is_alu_kill_inst(&info->shader->bc, alu)) {
-
+		} else if (is_alu_kill_inst(&info->shader->bc, alu))
 			an->flags |= AF_KEEP_ALIVE;
-		}
 
 		num_op = r600_bytecode_get_num_operands(&info->shader->bc, alu);
-
 		an->ins = vvec_create(num_op);
 
 		for (i=0;i<num_op;i++) {
@@ -465,19 +421,17 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 				alu->src[i].sel = 512 + kc_addr;
 			}
 
-			if (alu->src[i].sel < 128) {
-
+			if (alu->src[i].sel < 128)
 				v = get_var(info, alu->src[i].sel, alu->src[i].chan, 0);
-
-			} else if (alu->src[i].sel == V_SQ_ALU_SRC_PV || alu->src[i].sel == V_SQ_ALU_SRC_PS) {
+			else if (alu->src[i].sel == V_SQ_ALU_SRC_PV || alu->src[i].sel == V_SQ_ALU_SRC_PS) {
 				int prev_slot = (alu->src[i].sel == V_SQ_ALU_SRC_PS) ? 4 : alu->src[i].chan;
 				struct ast_node * p = slots[!cur_slots][prev_slot];
 
 				assert(p);
 
-				if (p->outs->keys[0]) {
+				if (p->outs->keys[0])
 					v = p->outs->keys[0];
-				} else {
+				else {
 					v = create_temp_var(info);
 					p->outs->keys[0] = v;
 				}
@@ -517,9 +471,9 @@ static void parse_cf(struct shader_info * info, struct ast_node * cfn)
 
 		cfn->ins = vvec_create(count*4);
 
-		for (q=0; q<count*4; q++) {
-			cfn->ins->keys[q] = (cf->output.swizzle[q&3]<4) ?  get_var(info, cf->output.gpr+(q>>2), cf->output.swizzle[q&3], 0) : NULL;
-		}
+		for (q=0; q<count*4; q++)
+			cfn->ins->keys[q] = (cf->output.swizzle[q&3]<4) ?
+					get_var(info, cf->output.gpr+(q>>2), cf->output.swizzle[q&3], 0) : NULL;
 
 		cfn->type = NT_OP;
 		cfn->flags |= AF_REG_CONSTRAINT;
@@ -534,7 +488,6 @@ static boolean parse_shader(struct shader_info * info, struct ast_node * root)
 {
 	struct r600_shader * shader = info->shader;
 	struct r600_bytecode_cf *cf;
-
 	struct ast_node * node = root;
 
 	LIST_FOR_EACH_ENTRY(cf,&shader->bc.cf,list) {
@@ -567,16 +520,12 @@ static boolean parse_shader(struct shader_info * info, struct ast_node * root)
 			}
 
 		} else if (!LIST_IS_EMPTY(&cf->tex)) {
-
 			if (!parse_cf_tex(info,cfn,cf)) return false;
-
 		} else if (!LIST_IS_EMPTY(&cf->vtx)) {
-
 			if (!parse_cf_vtx(info,cfn,cf)) return false;
-
-		} else {
+		} else
 			cfn->type = NT_OP;
-		}
+
 		node = node->rest;
 	}
 	return true;
@@ -587,9 +536,8 @@ static struct ast_node * find_cf_by_addr(struct ast_node * list, int addr)
 	assert(list->type == NT_LIST);
 
 	while (list) {
-		if (list->child && list->child->cf && list->child->label == addr) {
+		if (list->child && list->child->cf && list->child->label == addr)
 			return list->child;
-		}
 		list=list->rest;
 	}
 	return NULL;
@@ -599,17 +547,13 @@ static struct ast_node * convert_cf_if(struct shader_info * info, struct ast_nod
 {
 	int target = root->cf->cf_addr;
 	struct ast_node *list = root->parent, *end = NULL;
-
 	boolean without_else = root->cf->pop_count >0;
 
 	assert(list->type==NT_LIST);
-
 	list = list->rest;
-
 	R600_DUMP("converting if %p @ %d\n", root, root->cf->id);
 
 	end = find_cf_by_addr(list, target);
-
 	assert(end && end->cf);
 
 	if (!without_else && end->cf->inst == EG_V_SQ_CF_WORD1_SQ_CF_INST_ELSE) {
@@ -619,7 +563,6 @@ static struct ast_node * convert_cf_if(struct shader_info * info, struct ast_nod
 		R600_DUMP("converting if %p : else @ %d\n",root,  end->cf->id);
 
 		end = find_cf_by_addr(end->parent, end->cf->cf_addr);
-
 		assert(end);
 
 		R600_DUMP("converting if %p : end @ %d\n", root, end->cf->id);
@@ -635,11 +578,10 @@ static struct ast_node * convert_cf_if(struct shader_info * info, struct ast_nod
 		region->subtype = NST_IF_ELSE_REGION;
 
 		if (root->parent->rest!=n_else) {
-
 			depart2->child = root->parent->rest;
 			depart2->child->parent = depart2;
-
 		}
+
 		n_else->parent->rest = NULL;
 		end->parent->rest = NULL;
 
@@ -681,11 +623,8 @@ static struct ast_node * convert_cf_if(struct shader_info * info, struct ast_nod
 		root->flow_dep = get_var(info, REG_AM, 0,0);
 
 		/* FIXME: set the condition correctly */
-		//		root->condition = cnd;
 
 		root = region;
-
-
 	} else {
 		R600_DUMP("converting if %p: end @ %d\n", root, end->cf->id);
 
@@ -706,8 +645,6 @@ static struct ast_node * convert_cf_if(struct shader_info * info, struct ast_nod
 		root->outs->keys[0] = get_var(info, REG_AM, 0,0);
 
 		root->flow_dep = get_var(info, REG_AM, 0,0);
-
-//		root->condition = cnd;
 	}
 	return root;
 }
@@ -721,18 +658,11 @@ static int convert_cf_loop(struct shader_info * info, struct ast_node * root)
 
 	list = list->rest;
 
-	while (list) {
-		if (list->child && list->child->cf && list->child->label == target) {
-			end = list;
-			break;
-		}
-		list=list->rest;
-	}
-
+	end = find_cf_by_addr(list, target);
 	assert(end);
 
+	end = end->parent;
 	p=end->parent->child;
-
 	assert(p->cf && p->cf->inst == EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_END);
 
 	list=root->parent;
@@ -766,7 +696,8 @@ static void convert_loop_ops(struct shader_info * info, struct ast_node * root, 
 {
 	struct ast_node * p=root->parent;
 
-	while (p && p->repeat_count==0) p=p->parent;
+	while (p && p->repeat_count==0)
+		p=p->parent;
 
 	if (!p)
 		return;
@@ -804,25 +735,24 @@ static int convert_cf(struct shader_info * info, struct ast_node * root)
 		convert_cf(info, root->child);
 
 	if (root->cf && root->type == NT_OP) {
-		if (root->cf->inst == EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_START_NO_AL) {
+
+		switch (root->cf->inst) {
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_START_NO_AL:
 			convert_cf_loop(info, root);
 			convert_cf(info, root->child);
+			break;
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_JUMP:
+			root = convert_cf_if(info, root, true);
+			break;
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_BREAK:
+			convert_loop_ops(info, root, true);
+			break;
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_CONTINUE:
+			convert_loop_ops(info, root, false);
+			break;
 		}
 	}
 
-	if (root->cf && root->type == NT_OP) {
-		if (root->cf->inst == EG_V_SQ_CF_WORD1_SQ_CF_INST_JUMP) {
-			root = convert_cf_if(info, root,true);
-		}
-	}
-
-	if (root->cf && root->type == NT_OP) {
-		if (root->cf->inst == EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_BREAK) {
-			convert_loop_ops(info, root,true);
-		} else if (root->cf->inst == EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_CONTINUE) {
-			convert_loop_ops(info, root,false);
-		}
-	}
 	return 0;
 }
 
@@ -836,11 +766,9 @@ static void variables_defined(struct shader_info * info, struct ast_node * node)
 	if (node->rest)
 		variables_defined(info, node->rest);
 
-	if ((node->type == NT_DEPART || node->type == NT_REPEAT) && node->child) {
-
+	if ((node->type == NT_DEPART || node->type == NT_REPEAT) && node->child)
 		vset_addset(node->target_node->vars_defined, node->child->vars_defined);
-
-	} else if (node->type == NT_OP) {
+	else if (node->type == NT_OP) {
 
 		if (node->outs) {
 			vset_clear(node->vars_defined);
@@ -854,30 +782,25 @@ static void variables_defined(struct shader_info * info, struct ast_node * node)
 			vset_addvec(node->vars_defined, node->outs);
 		}
 
-		if (node->child) {
-			vset_addset(node->vars_defined, node->child->vars_defined );
-		}
-		if (node->rest) {
+		if (node->child)
+			vset_addset(node->vars_defined, node->child->vars_defined);
+
+		if (node->rest)
 			vset_addset(node->vars_defined, node->rest->vars_defined);
-		}
+
 
 		/* don't let alu clause locals to get out of clause */
 		if (node->subtype == NST_ALU_CLAUSE) {
 			int q;
-
 			for (q=0; q<node->vars_defined->count; q++) {
 				struct var_desc * v = node->vars_defined->keys[q];
-				if (v) {
-					if ((v->reg.reg == REG_PR) ||
-							(v->reg.reg < 128 && v->reg.reg >= 128-info->temp_gprs))	{
-
-						vset_remove(node->vars_defined, v);
-						q--;
-					}
+				if (v && ((v->reg.reg == REG_PR) ||
+						(v->reg.reg < 128 && v->reg.reg >= 128-info->temp_gprs))) {
+					vset_remove(node->vars_defined, v);
+					q--;
 				}
 			}
 		}
-
 	}
 }
 
@@ -887,8 +810,6 @@ static struct ast_node * phi_make_trivials(struct ast_node * node, int count)
 
 	struct ast_node *start=NULL, * p, *l=NULL;
 	for (i=0; i<node->vars_defined->count; i++) {
-
-
 		struct var_desc * v = node->vars_defined->keys[i];
 
 		p = create_node(NT_OP);
@@ -899,24 +820,21 @@ static struct ast_node * phi_make_trivials(struct ast_node * node, int count)
 
 		p->outs->keys[0] = v;
 
-		for (q=0; q<count; q++) {
+		for (q=0; q<count; q++)
 			p->ins->keys[q] = v;
-		}
 
 		if (l) {
 			l->rest = create_node(NT_LIST);
 			l->rest->parent = l;
 			l=l->rest;
-		} else {
+		} else
 			l = create_node(NT_LIST);
-		}
 
 		p->parent = l;
 		l->child = p;
 
-		if (start == NULL)
+		if (!start)
 			start = l;
-
 	}
 
 	return start;
@@ -930,14 +848,11 @@ static void insert_phi(struct ast_node * node)
 	if (node->rest)
 		insert_phi(node->rest);
 
-	if (node->type == NT_IF) {
-
+	if (node->type == NT_IF)
 		node->phi = phi_make_trivials(node,2);
 
-	} else if (node->type == NT_REGION) {
-
+	else if (node->type == NT_REGION) {
 		node->phi = phi_make_trivials(node, node->depart_count);
-
 		if (node->repeat_count)
 			node->loop_phi = phi_make_trivials(node, node->repeat_count+1);
 	}
@@ -946,9 +861,7 @@ static void insert_phi(struct ast_node * node)
 static struct var_desc * rename_var(struct shader_info * info, struct var_desc * var, int new_index)
 {
 	struct var_desc * new_var = get_var(info, var->reg.reg, var->reg.chan, new_index);
-
 	new_var->flags = var->flags;
-
 	return new_var;
 }
 
@@ -972,9 +885,7 @@ static void rename_phi_operand(struct shader_info * info, int n, struct ast_node
 		i = (uintptr_t)d;
 
 	v = rename_var(info, v, i);
-
 	add_use(v, phi);
-
 	phi->ins->keys[n-1] = v;
 }
 
@@ -991,16 +902,12 @@ static struct var_desc * rename_def(struct shader_info * info, struct var_desc *
 	VMAP_SET(renames, var, i);
 
 	var = rename_var(info, var, i);
-
 	var->def = node;
-
 	return var;
 }
 
 static struct var_desc * ssa_rename_use(struct shader_info * info, struct var_desc * vi, struct vmap * renames)
 {
-	assert(vi);
-
 	uintptr_t new_index = 0;
 	void * d;
 
@@ -1008,9 +915,7 @@ static struct var_desc * ssa_rename_use(struct shader_info * info, struct var_de
 		new_index = (uintptr_t)d;
 
 	vi = rename_var(info, vi, new_index);
-
 	return vi;
-
 }
 
 static void ssa_ins(struct shader_info * info, struct ast_node * node, struct vmap * renames)
@@ -1020,8 +925,7 @@ static void ssa_ins(struct shader_info * info, struct ast_node * node, struct vm
 	if (node->ins) {
 		for (i=0;i<node->ins->count;i++) {
 			struct var_desc * vi = node->ins->keys[i];
-
-			if (vi!=NULL) {
+			if (vi) {
 				vi = ssa_rename_use(info, vi, renames);
 				add_use(vi, node);
 				node->ins->keys[i] = vi;
@@ -1039,9 +943,8 @@ static void ssa_outs(struct shader_info * info, struct ast_node * node, struct v
 		for (i=0;i<node->outs->count;i++) {
 			struct var_desc * v = node->outs->keys[i];
 
-			if (v != NULL) {
-
-				assert(v->index==0);
+			if (v) {
+				assert(v->index == 0);
 
 				if (processed && vset_contains(processed, v)) {
 					uintptr_t ni = 0;
@@ -1051,10 +954,10 @@ static void ssa_outs(struct shader_info * info, struct ast_node * node, struct v
 						ni = (uintptr_t)d;
 
 					assert(ni);
-
 					v = rename_var(info, v, ni);
 				} else {
-					if (processed) vset_add(processed,v);
+					if (processed)
+						vset_add(processed,v);
 					v = rename_def(info, v, renames, node);
 				}
 
@@ -1105,9 +1008,7 @@ static void split_live_intervals(struct shader_info * info, struct ast_node * no
 				}
 
 				if (!dup) {
-
 					t = create_temp_var(info);
-
 					t->value_hint = i;
 
 					if (n != last_n) {
@@ -1125,14 +1026,9 @@ static void split_live_intervals(struct shader_info * info, struct ast_node * no
 				}
 
 				rc->comps->keys[q%4] = t;
-
-			} else {
+			} else
 				t = NULL;
-			}
-
-
 		}
-
 	}
 
 	if (node->outs) {
@@ -1159,9 +1055,7 @@ static void split_live_intervals(struct shader_info * info, struct ast_node * no
 			struct var_desc * o = node->outs->keys[q], *t;
 
 			if (o!=NULL) {
-
 				t = create_temp_var(info);
-
 				o->value_hint = t;
 
 				if (q/4 != last_n) {
@@ -1175,25 +1069,25 @@ static void split_live_intervals(struct shader_info * info, struct ast_node * no
 				t->constraint = rc;
 
 				rc->comps->keys[q&3] = t;
-
-			} else {
+			} else
 				t = NULL;
-			}
 
 			p->outs->keys[q] = node->outs->keys[q];
 			p->ins->keys[q] = t;
 			node->outs->keys[q] = t;
 		}
-
 	}
-
 }
 
 /* splitting live intervals for grouped instructions (reduction instructions, INTERP_*) */
 static void split_group_intervals(struct shader_info * info, struct ast_node * group)
 {
+	const int maxins = 2;
 	struct ast_node *c, * p_1, *p_2;
 	int q, in_count = 0;
+	boolean replicate = false;
+	struct var_desc * replicate_out = NULL;
+
 
 	p_1 = create_node(NT_OP);
 	p_1->subtype = NST_PCOPY;
@@ -1202,8 +1096,6 @@ static void split_group_intervals(struct shader_info * info, struct ast_node * g
 
 	p_1->parent = group;
 	p_2->parent = group;
-
-	const int maxins = 2;
 
 	p_1->ins = vvec_create_clean(4*maxins);
 	p_1->outs = vvec_create_clean(4*maxins);
@@ -1214,30 +1106,24 @@ static void split_group_intervals(struct shader_info * info, struct ast_node * g
 	c = group->child;
 	q = 0;
 
-	boolean replicate = false;
-	struct var_desc * replicate_out = NULL;
-
 	while (c) {
 		struct ast_node * n = c->child;
 		struct var_desc * v, * t;
 		int w;
 
-		if (!replicate && is_alu_replicate_inst(&info->shader->bc,n->alu)) {
+		if (!replicate && is_alu_replicate_inst(&info->shader->bc,n->alu))
 			replicate = true;
-		}
 
 		v = n->outs->keys[0];
 
 		if (v) {
-
 			t = create_temp_var(info);
 
 			if (replicate) {
-				if (replicate_out == NULL) {
+				if (!replicate_out)
 					replicate_out = t;
-				} else {
+				else
 					t->value_hint = replicate_out;
-				}
 			}
 
 			t->def = p_2;
@@ -1254,13 +1140,11 @@ static void split_group_intervals(struct shader_info * info, struct ast_node * g
 			if (v) {
 				int i;
 
-				for (i=0; i<q*maxins+w; i++) {
+				for (i=0; i<q*maxins+w; i++)
 					if (p_1->ins->keys[i] == v)
 						break;
-				}
 
 				if (i==q*maxins+w) {
-
 					in_count++;
 
 					t = create_temp_var(info);
@@ -1270,16 +1154,12 @@ static void split_group_intervals(struct shader_info * info, struct ast_node * g
 					p_1->outs->keys[q*maxins+w] = t;
 
 					t->value_hint = v;
-				} else {
+				} else
 					t = p_1->outs->keys[i];
-				}
 
 				n->ins->keys[w] = t;
-
 			}
 		}
-
-
 		q++;
 		c = c->rest;
 	}
@@ -1310,14 +1190,13 @@ static void split_group_intervals(struct shader_info * info, struct ast_node * g
 /* top-down code traversal */
 static void ssa(struct shader_info * info, struct ast_node * node, struct vmap * renames)
 {
-	if (!node) return;
+	if (!node)
+		return;
 
-	if (node->flow_dep) {
+	if (node->flow_dep)
 		node->flow_dep = ssa_rename_use(info, node->flow_dep, renames);
-	}
 
 	switch (node->type) {
-
 	case NT_REGION:
 		if (node->loop_phi) {
 			struct ast_node * p = node->loop_phi;
@@ -1333,7 +1212,6 @@ static void ssa(struct shader_info * info, struct ast_node * node, struct vmap *
 		if (node->phi) {
 			struct ast_node * p = node->phi;
 			while (p && p->child) {
-
 				p->child->outs->keys[0] = rename_def(info, p->child->outs->keys[0], renames, p->child);
 				p = p->rest;
 			}
@@ -1351,7 +1229,6 @@ static void ssa(struct shader_info * info, struct ast_node * node, struct vmap *
 
 		ssa_ins(info, node, renames);
 		ssa_outs(info, node, renames, NULL);
-
 		ssa(info, node->child, renames);
 
 		if (node->phi) {
@@ -1366,14 +1243,11 @@ static void ssa(struct shader_info * info, struct ast_node * node, struct vmap *
 
 	case NT_DEPART:
 	{
-
 		struct vmap * new_renames = vmap_createcopy(renames);
 
 		ssa(info, node->child, new_renames);
-
 		ssa_ins(info, node, renames);
 		ssa_outs(info, node, renames, NULL);
-
 
 		if (node->target_node && node->target_node->phi) {
 			struct ast_node * p = node->target_node->phi;
@@ -1387,9 +1261,7 @@ static void ssa(struct shader_info * info, struct ast_node * node, struct vmap *
 	break;
 
 	case NT_REPEAT:
-
 		ssa(info, node->child, renames);
-
 		ssa_ins(info, node, renames);
 		ssa_outs(info, node, renames, NULL);
 
@@ -1403,15 +1275,12 @@ static void ssa(struct shader_info * info, struct ast_node * node, struct vmap *
 		break;
 
 	case NT_LIST:
-
 		ssa(info, node->child, renames);
 		ssa(info, node->rest, renames);
 
-
-		if (node->child && node->child->subtype == NST_ALU_GROUP) {
-			//			if (node->child->child->child->flags & AF_CHAN_CONSTRAINT)
+		if (node->child && node->child->subtype == NST_ALU_GROUP)
 			split_group_intervals(info, node->child);
-		}
+
 		break;
 
 	case NT_GROUP:
@@ -1431,7 +1300,6 @@ static void ssa(struct shader_info * info, struct ast_node * node, struct vmap *
 				 * this correctly
 				 */
 				struct ast_node * c = node->parent->parent, *last_group=NULL;
-
 				struct ast_node * ii[5];
 				int count = 1, level=0;
 				ii[0] = node;
@@ -1451,9 +1319,8 @@ static void ssa(struct shader_info * info, struct ast_node * node, struct vmap *
 							while (c->rest)
 								c=c->rest;
 							continue;
-						} else {
+						} else
 							level--;
-						}
 					}
 					c = c->parent;
 				}
@@ -1468,36 +1335,29 @@ static void ssa(struct shader_info * info, struct ast_node * node, struct vmap *
 			ssa_ins(info, node, renames);
 			ssa_outs(info, node, renames, NULL);
 
-			if (node->flags & AF_REG_CONSTRAINT) {
+			if (node->flags & AF_REG_CONSTRAINT)
 				split_live_intervals(info, node);
-			}
 		}
 		break;
 
 	default:
-
 		assert(0);
 		break;
-
 	}
-
-
 }
 
 static void build_ssa(struct shader_info * info)
 {
 	struct vmap * renames = vmap_create(64);
+
 	info->def_count = vmap_create(64);
 
 	variables_defined(info, info->root);
-
 	insert_phi(info->root);
-
 	ssa(info, info->root, renames);
 
 	vmap_destroy(info->def_count);
 	vmap_destroy(renames);
-
 	info->def_count = NULL;
 }
 
@@ -1508,10 +1368,7 @@ static void update_ins_liveness(struct ast_node * node)
 	for(q=0; q<node->ins->count; q++) {
 		struct var_desc * v = node->ins->keys[q];
 		if (v) {
-			if (node->flags & AF_DEAD) {
-				//	v->flags |= VF_DEAD;
-			}
-			else
+			if (!(node->flags & AF_DEAD))
 				v->flags &= ~VF_DEAD;
 		}
 	}
@@ -1593,9 +1450,8 @@ static void node_ps_liveness(struct ast_node * node, struct vset * live)
 /* bottom-up code traversal */
 static void node_liveness(struct ast_node * node, struct vset * live)
 {
-	if (node->phi) {
+	if (node->phi)
 		outs_dead(node->phi, live);
-	}
 
 	if (node->type!=NT_LIST && ((node->subtype != NST_ALU_INST && node->subtype!=NST_COPY) || node->alu->last))
 		mark_interferences(live);
@@ -1605,33 +1461,22 @@ static void node_liveness(struct ast_node * node, struct vset * live)
 	else
 		node->vars_live_after = vset_createcopy(live);
 
-
 	if (node->p_split_outs) {
 		node_ps_liveness(node->p_split_outs, live);
 		mark_interferences(live);
 	}
 
-
 	if (node->type == NT_DEPART) {
-
 		vset_copy(live, node->target_node->vars_live_after);
-
-		if (node->target_node->phi) {
+		if (node->target_node->phi)
 			live_phi_branch(node->target_node->phi, live, node->depart_number);
-		}
 	}
 
-	if (node->type == NT_IF) {
-		if (node->phi) {
-			live_phi_branch(node->phi, live, 2);
-		}
-	}
+	if (node->type == NT_IF && node->phi)
+		live_phi_branch(node->phi, live, 2);
 
-	if (node->type == NT_REPEAT) {
-		if (node->target_node->loop_phi) {
-			live_phi_branch(node->target_node->loop_phi, live, node->repeat_number+1);
-		}
-	}
+	if (node->type == NT_REPEAT && node->target_node->loop_phi)
+		live_phi_branch(node->target_node->loop_phi, live, node->repeat_number+1);
 
 	if (node->rest)
 		node_liveness(node->rest, live);
@@ -1641,61 +1486,48 @@ static void node_liveness(struct ast_node * node, struct vset * live)
 
 	if (node->type == NT_IF) {
 		vset_addset(live, node->vars_live_after);
-
-		if (node->phi) {
+		if (node->phi)
 			live_phi_branch(node->phi, live, 1);
-		}
 	}
 
-	if (node->type == NT_OP)
-	{
+	if (node->type == NT_OP) {
 		if (node->outs && !(node->flags & AF_KEEP_ALIVE)) {
 			boolean alive = false;
 
 			for (int q=0; q<node->outs->count; q++) {
 				struct var_desc * o = node->outs->keys[q];
 				if (o) {
-					if (!vset_remove(live, o)) {
+					if (!vset_remove(live, o))
 						o->flags |= VF_DEAD;
-					} else {
+					else {
 						alive = true;
 						o->flags &= ~VF_DEAD;
 					}
 				}
 			}
 
-			if (!alive) {
+			if (!alive)
 				node->flags |= AF_DEAD;
-			} else {
+			else
 				node->flags &=~AF_DEAD;
-			}
-
 		}
 
-		if (!(node->flags & AF_DEAD) && node->ins) {
+		if (!(node->flags & AF_DEAD) && node->ins)
 			vset_addvec(live,node->ins);
-		}
 
-	} else if (node->type == NT_IF) {
-		if (node->ins)
+	} else if (node->type == NT_IF && node->ins)
 			vset_addvec(live,node->ins);
-	}
 
-	if (node->p_split) {
+	if (node->p_split)
 		node_liveness(node->p_split, live);
-	}
-
 
 	if (node->loop_phi) {
-
 		outs_dead(node->loop_phi, live);
 
-		if (node->child) {
+		if (node->child)
 			node_liveness(node->child, live);
-		}
 
 		outs_dead(node->loop_phi, live);
-
 		live_phi_branch(node->loop_phi, live, 1);
 	}
 
@@ -1723,15 +1555,12 @@ static void node_liveness(struct ast_node * node, struct vset * live)
 				}
 				n = n->rest;
 			}
-		} else {
+		} else
 			node->parent->parent->flags |= AF_DEAD;
-		}
 	}
 
-
-	if (node->flow_dep && !(node->flags & AF_DEAD)) {
+	if (node->flow_dep && !(node->flags & AF_DEAD))
 		vset_add(live,node->flow_dep);
-	}
 
 	if ((node->type != NT_LIST) && (node->subtype != NST_ALU_INST) && (node->subtype != NST_COPY))
 		mark_interferences(live);
@@ -1749,7 +1578,6 @@ static void liveness(struct shader_info * info)
 	node_liveness(info->root, live_vars);
 
 	vset_destroy(live_vars);
-
 	info->liveness_correct = true;
 }
 
@@ -1772,19 +1600,18 @@ static void check_copy(struct shader_info * info, struct var_desc * v)
 static struct ast_node * get_real_def_node(struct var_desc * v)
 {
 	struct ast_node * d = v->def;
-	if (!d) return NULL;
+	if (!d)
+		return NULL;
 
 	if (d->alu) {
 		int chan;
 
 		chan = d->alu->dst.chan;
 
-		if (chan==1 && d->alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_XY) {
+		if (chan==1 && d->alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_XY)
 			return d->parent->rest->child;
-		} else if (chan==3 && d->alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_ZW) {
+		else if (chan==3 && d->alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_ZW)
 			return d->parent->parent->parent->parent->child;
-		}
-
 	}
 
 	return d;
@@ -1793,15 +1620,14 @@ static struct ast_node * get_real_def_node(struct var_desc * v)
 static void check_copy2(struct shader_info * info, struct var_desc * v)
 {
 	struct var_desc * s = v->value_hint;
+	struct ast_node *vdef = get_real_def_node(v);
+	struct ast_node *sdef = get_real_def_node(s);
 
 	R600_DUMP( "check_copy2: ");
 	print_var(v);
 	R600_DUMP( " from ");
 	print_var(s);
 	R600_DUMP( "\n");
-
-	struct ast_node *vdef = get_real_def_node(v);
-	struct ast_node *sdef = get_real_def_node(s);
 
 	if (vdef && (vdef->flags & AF_ALU_CLAMP_DST) && s->def && sdef->alu && !(sdef->flags & AF_ALU_CLAMP_DST)) {
 		struct use_desc * u = s->uses;
@@ -1822,15 +1648,12 @@ static void check_copy2(struct shader_info * info, struct var_desc * v)
 			u = u->next;
 		}
 
-		if (can_propagate) {
+		if (can_propagate)
 			sdef->flags |= AF_ALU_CLAMP_DST;
-		}
 	}
 
-
-	if (s->value_hint) {
+	if (s->value_hint)
 		check_copy2(info, s);
-	}
 }
 
 static void analyze_vars(struct shader_info * info)
@@ -1843,30 +1666,26 @@ static void analyze_vars(struct shader_info * info)
 		if (v->flags & VF_SPECIAL)
 			continue;
 
-		if (v->def == NULL) {
-			if (v->uses == NULL) {
+		if (!v->def) {
+			unsigned rc = REGCHAN_KEY(v->reg.reg, v->reg.chan);
+
+			if (!v->uses) {
 				vmap_remove(info->vars, info->vars->keys[q--*2]);
 				destroy_var(v);
 				continue;
 			}
 
-
 			if (v->reg.reg > info->last_input_gpr) {
-
 				R600_DUMP( "undefined var usage : ");
 				print_var(v);
 				R600_DUMP("\n");
 
 				v->flags |= VF_UNDEFINED;
-
-			   continue;
+				continue;
 			}
 
 			/* var never defined - probably input */
 			v->flags |= VF_PIN_CHAN | VF_PIN_REG;
-
-			unsigned rc = REGCHAN_KEY(v->reg.reg, v->reg.chan);
-
 			v->color = rc;
 
 			if (rc>info->last_color)
@@ -1888,7 +1707,6 @@ static void analyze_vars(struct shader_info * info)
 				}
 			} else {
 				struct use_desc * u = v->uses;
-
 				while (u) {
 					if (u->use->flags & AF_CHAN_CONSTRAINT) {
 						v->flags |= VF_PIN_CHAN;
@@ -1898,9 +1716,8 @@ static void analyze_vars(struct shader_info * info)
 				}
 			}
 
-			if (v->def->flags & AF_COPY_HINT) {
+			if (v->def->flags & AF_COPY_HINT)
 				check_copy(info, v);
-			}
 		}
 	}
 
@@ -1908,14 +1725,11 @@ static void analyze_vars(struct shader_info * info)
 		struct var_desc * v = info->vars->keys[q*2+1];
 
 		if (v->def) {
-
 			if ((v->flags & VF_DEAD) || (v->def->flags & AF_DEAD))
 				continue;
 
-			if ((v->def->flags & AF_COPY_HINT) && v->value_hint) {
+			if ((v->def->flags & AF_COPY_HINT) && v->value_hint)
 				check_copy2(info, v);
-			}
-
 		}
 	}
 
@@ -1976,7 +1790,6 @@ static void analyze_vars(struct shader_info * info)
 		struct var_desc * v = info->vars->keys[q*2+1];
 
 		if (v->def) {
-
 			if ((v->flags & VF_DEAD) || (v->def->flags & AF_DEAD))
 				continue;
 
@@ -1993,14 +1806,13 @@ static void analyze_vars(struct shader_info * info)
 
 				if(v->def->flags & AF_COPY_HINT)
 					v->def->subtype = NST_COPY;
-				//				}
+
 				while (v->value_hint->value_hint)
 					v->value_hint = v->value_hint->value_hint;
 
 
-				if (v->value_hint && (v->flags & VF_PIN_CHAN) && !(v->def && (v->def->flags & AF_CHAN_CONSTRAINT))) {
+				if (v->value_hint && (v->flags & VF_PIN_CHAN) && !(v->def && (v->def->flags & AF_CHAN_CONSTRAINT)))
 					v->reg.chan = v->value_hint->reg.chan;
-				}
 			}
 		}
 	}
@@ -2035,7 +1847,6 @@ void destroy_ast(struct ast_node * n)
 	vset_destroy(n->vars_live_after);
 
 	free(n);
-
 }
 
 static void set_alu_regs(struct shader_info * info, struct ast_node * node)
@@ -2102,10 +1913,7 @@ static void fix_alu_replicate_regs(struct shader_info * info, struct ast_node * 
 
 static void set_regs(struct shader_info * info, struct ast_node * node)
 {
-
-
 	if (node->tex) {
-
 		if (node->ins) {
 			int q, gpr = -1;
 
@@ -2122,15 +1930,14 @@ static void set_regs(struct shader_info * info, struct ast_node * node)
 						assert(0);
 					}
 					ssel = KEY_CHAN(rc);
-				} else {
+				} else
 					ssel = 7;
-				}
 
 				node->tex->src_sel[q] = ssel;
 			}
-
 			node->tex->src_gpr = gpr;
 		}
+
 		if (node->outs) {
 			int q, gpr = -1;
 
@@ -2149,7 +1956,6 @@ static void set_regs(struct shader_info * info, struct ast_node * node)
 					else if (gpr + (q/4) != KEY_REG(rc)) {
 						R600_DUMP( "set_reg: tex outs: vars in different gprs\n");
 						assert(0);
-
 					}
 
 					dsel = KEY_CHAN(rc);
@@ -2161,7 +1967,6 @@ static void set_regs(struct shader_info * info, struct ast_node * node)
 			node->tex->dst_gpr = gpr>=0 ? gpr : 0;
 		}
 	} else if (node->vtx) {
-
 		if (node->ins) {
 			int q, gpr = -1;
 
@@ -2182,10 +1987,8 @@ static void set_regs(struct shader_info * info, struct ast_node * node)
 						assert(0);
 					}
 					ssel = KEY_CHAN(rc);
-				} else {
+				} else
 					assert(0);
-					//					ssel = 7;
-				}
 
 				node->vtx->src_sel[q] = ssel;
 			}
@@ -2229,20 +2032,17 @@ static void set_regs(struct shader_info * info, struct ast_node * node)
 static void fix_loop_ops(struct shader_info * info, struct ast_node * node)
 {
 	if (node->subtype == NST_LOOP_BREAK || node->subtype == NST_LOOP_CONTINUE) {
-
 		struct ast_node * p = node->parent;
 
 		while (p && p->subtype!=NST_LOOP_REGION)
 			p = p->parent;
 
 		assert(p);
-
 		node->new_cf->cf_addr = p->new_cf->id;
 
 	} else {
 		if (node->child)
 			fix_loop_ops(info, node->child);
-
 		if (node->rest)
 			fix_loop_ops(info, node->rest);
 	}
@@ -2278,17 +2078,16 @@ static void destroy_shader_info(struct shader_info * info)
 
 		destroy_constraint(v->constraint, false);
 		destroy_constraint(v->bs_constraint, true);
-
 		destroy_var(v);
 	}
 
 	vmap_destroy(info->vars);
 
 	if (info->chunk_queue) {
+		struct affinity_chunk * c;
 
 		vque_destroy(info->chunk_groups);
 
-		struct affinity_chunk * c;
 		while (VQUE_DEQUEUE(info->chunk_queue,&c)) {
 
 			struct chunk_group * g = c->group;
@@ -2308,11 +2107,10 @@ static void destroy_shader_info(struct shader_info * info)
 		vque_destroy(info->chunk_queue);
 
 		struct affinity_edge * e;
-		while (VQUE_DEQUEUE(info->edge_queue, &e)) {
+		while (VQUE_DEQUEUE(info->edge_queue, &e))
 			free(e);
-		}
-		vque_destroy(info->edge_queue);
 
+		vque_destroy(info->edge_queue);
 	}
 }
 
@@ -2347,25 +2145,23 @@ static void build_shader_node(struct shader_info * info, struct ast_node * node)
 static void emit_if_else(struct shader_info * info, struct ast_node * node)
 {
 	struct ast_node * n_if = node->child->child->child->child->child;
-
 	struct ast_node * n_else = node->child->child->rest->rest;
+	struct r600_bytecode_cf * cf_if_jump, * cf_if_else, * cf_if_pop;
 
 	r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_JUMP);
-	struct r600_bytecode_cf * cf_if_jump = info->bc->cf_last;
+	cf_if_jump = info->bc->cf_last;
 
 	push_stack(info);
-
 	build_shader_node(info, n_if);
 
 	r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_ELSE);
-	struct r600_bytecode_cf * cf_if_else = info->bc->cf_last;
+	cf_if_else = info->bc->cf_last;
 
 	build_shader_node(info, n_else);
-
 	pop_stack(info);
 
 	r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_POP);
-	struct r600_bytecode_cf * cf_if_pop = info->bc->cf_last;
+	cf_if_pop = info->bc->cf_last;
 
 	cf_if_jump->cf_addr = cf_if_else->id;
 	cf_if_else->cf_addr = cf_if_pop->id + 2;
@@ -2381,87 +2177,67 @@ static void build_shader_node(struct shader_info * info, struct ast_node * node)
 	static int iii = 0;
 #endif
 
-	if (node==NULL)
+	if (!node || (node->flags & AF_DEAD))
 		return;
-
-	if (node->flags & AF_DEAD) return;
-
-/*	if (node->subtype == NST_ALU_CLAUSE) {
-		info->bc->force_add_cf = 1;
-		info->kill = false;
-	} else */
 
 	if (node->subtype == NST_ALU_GROUP) {
 		if (is_alu_replicate_inst(&info->shader->bc,node->child->child->alu))
 			fix_alu_replicate_regs(info, node);
 	} else if (node->alu) {
+		int r;
+		unsigned alu_type;
+		struct r600_bytecode_alu * p;
 
 		node->alu->dst.clamp = (node->flags & AF_ALU_CLAMP_DST) ? 1 : 0;
-
-		int r;
-
-		unsigned alu_type;
-
 		set_alu_regs(info, node);
 
 		R600_DUMP("building alu: %d ", ++iii);
 		dump_node(info,node,0);
 
-		if (info->bc->cf_last && !LIST_IS_EMPTY(&info->bc->cf_last->alu)) {
+		if (info->bc->cf_last && !LIST_IS_EMPTY(&info->bc->cf_last->alu))
 			alu_type = info->bc->cf_last->inst;
-		} else {
+		else
 			alu_type = EG_V_SQ_CF_ALU_WORD1_SQ_CF_INST_ALU;
-		}
 
-		if (node->alu->predicate) {
+		if (node->alu->predicate)
 			alu_type =  EG_V_SQ_CF_ALU_WORD1_SQ_CF_INST_ALU_PUSH_BEFORE;
-		}
 
-		r=r600_bytecode_add_alu_type(info->bc, node->alu, alu_type);
-
-		struct r600_bytecode_alu * p = LIST_ENTRY(struct r600_bytecode_alu, info->bc->cf_last->alu.prev, list);
+		r = r600_bytecode_add_alu_type(info->bc, node->alu, alu_type);
+		p = LIST_ENTRY(struct r600_bytecode_alu, info->bc->cf_last->alu.prev, list);
 
 		R600_DUMP_CALL(dump_alu(info, 0, p));
 
-		if (r!=0) {
+		if (r) {
 			R600_DUMP("################### building alu failed:\n");
 			dump_node(info,node,0);
 			R600_DUMP("###################\n");
 			assert(0);
 		}
 
-		if ((node->flags & AF_ALU_CLAUSE_SPLIT) || is_alu_kill_inst(info->bc, node->alu)) {
+		if ((node->flags & AF_ALU_CLAUSE_SPLIT) || is_alu_kill_inst(info->bc, node->alu))
 			info->force_cf = true;
-		}
 
 		if (info->force_cf && node->alu->last) {
 			info->bc->force_add_cf = 1;
 			info->force_cf = false;
 		}
 
-		if (p->last) {
+		if (p->last)
 			info->stats[1].nalugroups++;
-		}
-
 
 	} else if (node->tex) {
-
 		set_regs(info, node);
-
 		r600_bytecode_add_tex(info->bc, node->tex);
-
 	} else if (node->vtx) {
-
 		set_regs(info, node);
-
 		r600_bytecode_add_vtx(info->bc, node->vtx);
-
 	}
 
 	if (node->subtype == NST_LOOP_REGION) {
+		struct r600_bytecode_cf * cfl_start, * cfl_end;
 
 		r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_START_NO_AL);
-		struct r600_bytecode_cf * cfl_start = info->bc->cf_last;
+		cfl_start = info->bc->cf_last;
 
 		push_stack(info);
 
@@ -2473,7 +2249,7 @@ static void build_shader_node(struct shader_info * info, struct ast_node * node)
 		pop_stack(info);
 
 		r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_END);
-		struct r600_bytecode_cf * cfl_end = info->bc->cf_last;
+		cfl_end = info->bc->cf_last;
 
 		cfl_end->cf_addr = cfl_start->id + 2;
 		cfl_start->cf_addr = cfl_end->id + 2;
@@ -2483,11 +2259,11 @@ static void build_shader_node(struct shader_info * info, struct ast_node * node)
 		fix_loop_ops(info, node->child);
 
 		return;
+
 	} else if (node->subtype == NST_LOOP_BREAK) {
 
 		if (node->child)
 			build_shader_node(info, node->child);
-
 
 		r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_BREAK);
 		node->new_cf = info->bc->cf_last;
@@ -2503,42 +2279,36 @@ static void build_shader_node(struct shader_info * info, struct ast_node * node)
 		r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_CONTINUE);
 		node->new_cf = info->bc->cf_last;
 		node->stack_level = info->stack_level;
-
 		return;
 
 	} else if (node->subtype == NST_IF_ELSE_REGION) {
-
 		emit_if_else(info, node);
-
 		return;
 	} else if (node->type == NT_IF) {
+		struct r600_bytecode_cf * cf_if_jump, * cf_if_pop;
 
 		r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_JUMP);
-		struct r600_bytecode_cf * cf_if_jump = info->bc->cf_last;
+		cf_if_jump = info->bc->cf_last;
 
 		push_stack(info);
-
 		build_shader_node(info, node->child);
-
 		pop_stack(info);
 
 		r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_POP);
-		struct r600_bytecode_cf * cf_if_pop = info->bc->cf_last;
+		cf_if_pop = info->bc->cf_last;
 
 		cf_if_jump->cf_addr = cf_if_pop->id + 2;
 		cf_if_pop->cf_addr = cf_if_pop->id + 2;
 
 		cf_if_jump->pop_count = 1;
 		cf_if_pop->pop_count = 1;
-
 		return;
+
 	} else if (node->cf) {
 
-		if (node->cf->inst == EG_V_SQ_CF_WORD1_SQ_CF_INST_CALL_FS) {
-
+		if (node->cf->inst == EG_V_SQ_CF_WORD1_SQ_CF_INST_CALL_FS)
 			r600_bytecode_add_cfinst(info->bc,node->cf->inst);
-
-		} else if (node->cf->inst == EG_V_SQ_CF_ALLOC_EXPORT_WORD1_SQ_CF_INST_EXPORT ||
+		else if (node->cf->inst == EG_V_SQ_CF_ALLOC_EXPORT_WORD1_SQ_CF_INST_EXPORT ||
 				node->cf->inst == EG_V_SQ_CF_ALLOC_EXPORT_WORD1_SQ_CF_INST_EXPORT_DONE) {
 
 			int q, w, gpr, burst_count = node->ins->count >> 2;
@@ -2549,11 +2319,9 @@ static void build_shader_node(struct shader_info * info, struct ast_node * node)
 			out.burst_count = 1;
 
 			for (q=0; q<burst_count; q++) {
-
 				gpr = -1;
 
 				for (w=0; w<4; w++) {
-
 					struct var_desc * v = node->ins->keys[q*4+w];
 					if (v) {
 						/* FIXME: VF_UNDEFINED isn't propagated through psplit,
@@ -2574,21 +2342,16 @@ static void build_shader_node(struct shader_info * info, struct ast_node * node)
 							out.swizzle[w] = KEY_CHAN(rc);
 						} else
 							out.swizzle[w] = 7;
-					} else {
+					} else
 						out.swizzle[w] = node->cf->output.swizzle[w];
-					}
 				}
-				if (q == burst_count-1) {
-//					out.end_of_program = node->cf->output.end_of_program;
+				if (q == burst_count-1)
 					out.inst = node->cf->output.inst;
-				}
 
 				out.gpr = (gpr == -1) ? 0 : gpr;;
-
 				r600_bytecode_add_output(info->bc,&out);
 
 				out.array_base++;
-
 				if ((int)info->bc->ngpr <= gpr)
 					info->bc->ngpr = gpr+1;
 			}
@@ -2626,16 +2389,13 @@ static int build_shader(struct shader_info * info)
 
 	info->result_code = SR_SUCCESS;
 
-	dot_create_file(info);
+	/* replace original bytecode with optimized */
 
 	info->bc->cf.next->prev = &info->shader->bc.cf;
 	info->bc->cf.prev->next = &info->shader->bc.cf;
-
 	r600_bytecode_clear(&info->shader->bc);
 	memcpy(&info->shader->bc, info->bc, sizeof(struct r600_bytecode));
-
 	free(info->bc);
-
 	return 0;
 }
 
@@ -2647,6 +2407,8 @@ static boolean create_shader_tree(struct shader_info * info)
 
 	info->root->child = create_node(NT_LIST);
 
+	/* parse source r600_bytecode */
+
 	if (!parse_shader(info, info->root->child)) {
 		return false;
 	}
@@ -2655,61 +2417,30 @@ static boolean create_shader_tree(struct shader_info * info)
 
 	info->edge_queue = vque_create(32);
 
+	/* construct SSA form */
 
 	build_ssa(info);
-
-//	dump_shader_tree(info);
-
-#define OPT_PATH 1
-	/* values are 1,2,3.
-	 * main path is 1 (without pre-pass), others are intended just to uncover bugs.
-	 * this setting affects instruction order, register allocation etc.
-	 *
-	 * ideally every path should produce correct result.
-	 *
-	 * (probably with some more advanced instruction selection algorithm
-	 * pre-pass may in fact improve the results)
-	 */
-
-#if OPT_PATH <=2
 	liveness(info);
 	analyze_vars(info);
-#endif
 
-#if OPT_PATH >=2
-
-	pre_schedule(info);
-	reset_interferences(info);
-	liveness(info);
-
-#if OPT_PATH >2
-	analyze_vars(info);
-#endif
-
-#endif
+	/* global scheduling (initial support - fetch combining etc) */
 
 	gs_schedule(info);
-
 	reset_interferences(info);
 	liveness(info);
 
-//	dump_shader_tree(info);
+
+	/* initial register allocation */
 
 	color(info);
-
-//	dump_var_table(info);
-
 	coalesce(info);
 
 	dump_var_table(info);
-
 	dump_shader_tree(info);
 
-	// insert_copies(info, info->root);
-
-	// dump_shader_tree(info);
-
 	info->liveness_correct = false;
+
+	/* alu scheduling */
 
 	if (!post_schedule(info)) {
 		info->result_code = SR_FAIL_SCHEDULE;
@@ -2747,6 +2478,8 @@ int r600_shader_optimize(struct r600_pipe_context * rctx, struct r600_pipe_shade
 	static int shaders_opt = -1;
 	static struct shader_stats global_stats[2] = {};
 	static int shader_num = 0;
+	int r = 0;
+	struct shader_info info;
 
 	if (dump_global_stats == -1)
 		dump_global_stats = debug_get_bool_option("R600_OPT_DUMP_STATS", false);
@@ -2755,8 +2488,15 @@ int r600_shader_optimize(struct r600_pipe_context * rctx, struct r600_pipe_shade
 		shaders_opt = debug_get_bool_option("R600_SHADERS_OPT", true);
 
 	// only EVERGREEN is supported currently
-	if (rctx->chip_class != EVERGREEN)
+	if (rctx->chip_class != EVERGREEN) {
+		R600_ERR("shader optimization: unsupported chip\n");
 		return -1;
+	}
+
+	++shader_num;
+
+	get_dump_level();
+	print_info = check_dump_level(R600_OPT_DUMP_LEVEL_INFO);
 
 #ifdef DEBUG
 
@@ -2770,19 +2510,10 @@ int r600_shader_optimize(struct r600_pipe_context * rctx, struct r600_pipe_shade
 	static int skip_num = 122;
 	static int skip_cnt = 1;
 
-#endif
-
-	get_dump_level();
-
-	print_info = check_dump_level(R600_OPT_DUMP_LEVEL_INFO);
-
-	++shader_num;
-
-#ifdef DEBUG
 	if (skip_mode) {
-		if (skip_num==-1) {
+		if (skip_num==-1)
 			skip_num = debug_get_num_option("R600_OPT_SKIP",0);
-		}
+
 		if ((skip_mode==1) == ((shader_num >= skip_num) && (shader_num < (skip_num + skip_cnt)))) {
 			printf("skipping shader %d\n", shader_num);
 			return -1;
@@ -2790,13 +2521,9 @@ int r600_shader_optimize(struct r600_pipe_context * rctx, struct r600_pipe_shade
 	}
 #endif
 
-	int r = 0;
-	struct shader_info info;
-
 	memset(&info,0,sizeof(struct shader_info));
 
 	info.temp_gprs = 4;
-
 	info.next_temp = 1;
 	info.dump = dump;
 
@@ -2804,7 +2531,6 @@ int r600_shader_optimize(struct r600_pipe_context * rctx, struct r600_pipe_shade
 	info.shader = &pipeshader->shader;
 
 	if (!shaders_opt) {
-
 		dump_bytecode(&info);
 		return 0;
 	}
@@ -2819,17 +2545,15 @@ int r600_shader_optimize(struct r600_pipe_context * rctx, struct r600_pipe_shade
 	if (print_info) {
 		info.stats[0].ngpr = info.shader->bc.ngpr;
 		info.stats[0].ndw = info.shader->bc.ndw;
-
 		dump_bytecode(&info);
-
 		printf("optimizing shader %d\n", shader_num);
 	}
 
 	info.max_slots = info.shader->bc.chip_class == CAYMAN ? 4 : 5;
 
-	if (create_shader_tree(&info)) {
+	if (create_shader_tree(&info))
 		r = build_shader(&info);
-	} else
+	else
 		r = -1;
 
 	destroy_shader_info(&info);
@@ -2850,7 +2574,6 @@ int r600_shader_optimize(struct r600_pipe_context * rctx, struct r600_pipe_shade
 				assert(0);
 			}
 		} else {
-
 			assert(info.result_code == SR_SUCCESS);
 
 			info.stats[1].ngpr = info.shader->bc.ngpr;
@@ -2862,7 +2585,6 @@ int r600_shader_optimize(struct r600_pipe_context * rctx, struct r600_pipe_shade
 			if (dump_global_stats) {
 				shader_stats_accumulate(&global_stats[0],&info.stats[0]);
 				shader_stats_accumulate(&global_stats[1],&info.stats[1]);
-
 				printf("INFO: global stats : ");
 				shader_stats_print_diff(&global_stats[0],&global_stats[1]);
 			}

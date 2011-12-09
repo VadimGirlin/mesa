@@ -24,11 +24,9 @@
 
 #include "eg_sq.h"
 #include "evergreend.h"
-
 #include "opt_core.h"
 
 static char * chans = "xyzwt";
-
 
 int _r600_opt_dump_level = -1;
 
@@ -139,46 +137,67 @@ static void fprint_alu_src(FILE * f, struct r600_bytecode_alu_src * src)
 	unsigned sel = src->sel, chan = src->chan, rel = src->rel;
 	boolean prchan = true;
 
-	if (src->neg) fprintf(f, "-");
-	if (src->abs) fprintf(f, "|");
+	if (src->neg)
+		fprintf(f, "-");
 
-	if (sel<128) fprintf(f, "R%u", sel);
-	else if (sel<160) fprintf(f, "KC0[%u]", sel-128);
-	else if (sel<192) fprintf(f, "KC1[%u]", sel-160);
+	if (src->abs)
+		fprintf(f, "|");
+
+	if (sel<128)
+		fprintf(f, "R%u", sel);
+	else if (sel<160)
+		fprintf(f, "KC0[%u]", sel-128);
+	else if (sel<192)
+		fprintf(f, "KC1[%u]", sel-160);
 	else if (sel>=256) {
-		if (sel>=512) fprintf(f, "CC%u",sel-512);
-		else if (sel>=448) fprintf(f, "Param%u",sel-448);
-		else if (sel>=288) fprintf(f, "KC3[%u]",sel-288);
-		else if (sel>=256) fprintf(f, "KC2[%u]",sel-256);
+		if (sel>=512)
+			fprintf(f, "CC%u",sel-512);
+		else if (sel>=448)
+			fprintf(f, "Param%u",sel-448);
+		else if (sel>=288)
+			fprintf(f, "KC3[%u]",sel-288);
+		else if (sel>=256)
+			fprintf(f, "KC2[%u]",sel-256);
 	} else {
 		switch (sel) {
-		case 248: fprintf(f,"0.0f");prchan=false;
-		break;
-		case 249: fprintf(f,"1.0f");prchan=false;
-		break;
-		case 250: fprintf(f,"1");prchan=false;
-		break;
-		case 252: fprintf(f,"0.5f");prchan=false;
-		break;
+		case 248:
+			fprintf(f,"0.0f");
+			prchan=false;
+			break;
+		case 249:
+			fprintf(f,"1.0f");
+			prchan=false;
+			break;
+		case 250:
+			fprintf(f,"1");
+			prchan=false;
+			break;
+		case 252:
+			fprintf(f,"0.5f");
+			prchan=false;
+			break;
 		case 253:
 			fprintf(f,"( %f [0x%08X] )", *(float*)&src->value, src->value); prchan=false;
 			break;
-		case 254: fprintf(f,"PV");
-		break;
-		case 255: fprintf(f,"PS"); prchan=false;
-		break;
-
-		default: fprintf(f,"V%u",sel);
+		case 254:
+			fprintf(f,"PV");
+			break;
+		case 255:
+			fprintf(f,"PS"); prchan=false;
+			break;
+		default:
+			fprintf(f,"V%u",sel);
 		}
 	}
 
-	if (rel) {
+	if (rel)
 		fprintf(f,"[AR]");
-	}
 
-	if (prchan) fprintf(f,".%c",chans[chan]);
+	if (prchan)
+		fprintf(f,".%c",chans[chan]);
 
-	if (src->abs) fprintf(f, "|");
+	if (src->abs)
+		fprintf(f, "|");
 
 }
 
@@ -194,29 +213,16 @@ static void fprint_alu_dst(FILE * f, struct r600_bytecode_alu_dst * dst) {
 
 
 	if (dst->write) {
-		if (sel<128) fprintf(f, "R%u", sel);
-		else if (sel<160) fprintf(f, "KC0[%u]", sel-128);
-		else if (sel<192) fprintf(f, "KC1[%u]", sel-160);
-		else if (sel>=256) fprintf(f, "C%u",sel-256);
-		else {
-			//		prchan=false;
-			switch (sel) {
-			case 248: fprintf(f,"0.0f");prchan=false;
-			break;
-			case 249: fprintf(f,"1.0f");prchan=false;
-			break;
-			case 252: fprintf(f,"0.5f");prchan=false;
-			break;
-			case 253: fprintf(f,"literal");
-			break;
-			case 254: fprintf(f,"PV");
-			break;
-			case 255: fprintf(f,"PS"); prchan=false;
-			break;
-
-			default: fprintf(f,"V%u",sel);
-			}
-		}
+		if (sel<128)
+			fprintf(f, "R%u", sel);
+		else if (sel<160)
+			fprintf(f, "KC0[%u]", sel-128);
+		else if (sel<192)
+			fprintf(f, "KC1[%u]", sel-160);
+		else if (sel>=256)
+			fprintf(f, "C%u",sel-256);
+		else
+			fprintf(f,"V%u",sel);
 	}
 	else
 		fprintf(f,"__");
@@ -321,8 +327,6 @@ void dump_vtx(struct shader_info * info, int level, struct r600_bytecode_vtx * v
 	else
 		fprintf(stderr,"\t\t(vtx_inst_0x%X)\t ", vtx->inst);
 
-
-
 	fprintf(stderr,"R%u.",vtx->dst_gpr);
 
 	fprint_swz_n(stderr, vtx->dst_sel, 4);
@@ -331,7 +335,6 @@ void dump_vtx(struct shader_info * info, int level, struct r600_bytecode_vtx * v
 
 	fprintf(stderr,", R%u.",vtx->src_gpr);
 	fprint_swz(stderr, vtx->src_sel[0]);
-//	fprint_swz(stderr, vtx->src_sel_y);
 
 	fprintf(stderr,"\n");
 }
@@ -347,21 +350,21 @@ void dump_cf(struct shader_info * info, int level, struct r600_bytecode_cf * cf)
 	case (EG_V_SQ_CF_ALU_WORD1_SQ_CF_INST_ALU_POP_AFTER):
 	case (EG_V_SQ_CF_ALU_WORD1_SQ_CF_INST_ALU_POP2_AFTER):
 	case (EG_V_SQ_CF_ALU_WORD1_SQ_CF_INST_ALU_PUSH_BEFORE):
-		indent(level);
-		fprintf(stderr, "%04d %08X ALU ", id, bc->bytecode[id]);
-		fprintf(stderr, "ADDR:%d ", cf->addr);
-		fprintf(stderr, "KCACHE_MODE0:%X ", cf->kcache[0].mode);
-		fprintf(stderr, "KCACHE_BANK0:%X ", cf->kcache[0].bank);
-		fprintf(stderr, "KCACHE_BANK1:%X\n", cf->kcache[1].bank);
-		id++;
-		indent(level);
-		fprintf(stderr, "%04d %08X ALU ", id, bc->bytecode[id]);
-		fprintf(stderr, "INST:0x%X %s ", EG_G_SQ_CF_ALU_WORD1_CF_INST(cf->inst), eg_cf_alu_inst_names[EG_G_SQ_CF_ALU_WORD1_CF_INST(cf->inst)]);
-		fprintf(stderr, "KCACHE_MODE1:%X ", cf->kcache[1].mode);
-		fprintf(stderr, "KCACHE_ADDR0:%X ", cf->kcache[0].addr);
-		fprintf(stderr, "KCACHE_ADDR1:%X ", cf->kcache[1].addr);
-		fprintf(stderr, "COUNT:%d\n", cf->ndw / 2);
-		break;
+	indent(level);
+	fprintf(stderr, "%04d %08X ALU ", id, bc->bytecode[id]);
+	fprintf(stderr, "ADDR:%d ", cf->addr);
+	fprintf(stderr, "KCACHE_MODE0:%X ", cf->kcache[0].mode);
+	fprintf(stderr, "KCACHE_BANK0:%X ", cf->kcache[0].bank);
+	fprintf(stderr, "KCACHE_BANK1:%X\n", cf->kcache[1].bank);
+	id++;
+	indent(level);
+	fprintf(stderr, "%04d %08X ALU ", id, bc->bytecode[id]);
+	fprintf(stderr, "INST:0x%X %s ", EG_G_SQ_CF_ALU_WORD1_CF_INST(cf->inst), eg_cf_alu_inst_names[EG_G_SQ_CF_ALU_WORD1_CF_INST(cf->inst)]);
+	fprintf(stderr, "KCACHE_MODE1:%X ", cf->kcache[1].mode);
+	fprintf(stderr, "KCACHE_ADDR0:%X ", cf->kcache[0].addr);
+	fprintf(stderr, "KCACHE_ADDR1:%X ", cf->kcache[1].addr);
+	fprintf(stderr, "COUNT:%d\n", cf->ndw / 2);
+	break;
 	case EG_V_SQ_CF_WORD1_SQ_CF_INST_TEX:
 		indent(level);
 		fprintf(stderr, "%04d %08X TEX ", id, bc->bytecode[id]);
@@ -409,27 +412,27 @@ void dump_cf(struct shader_info * info, int level, struct r600_bytecode_cf * cf)
 		fprintf(stderr,"\n");
 
 		break;
-	case EG_V_SQ_CF_WORD1_SQ_CF_INST_JUMP:
-	case EG_V_SQ_CF_WORD1_SQ_CF_INST_ELSE:
-	case EG_V_SQ_CF_WORD1_SQ_CF_INST_POP:
-	case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_START_NO_AL:
-	case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_END:
-	case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_CONTINUE:
-	case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_BREAK:
-	case EG_V_SQ_CF_WORD1_SQ_CF_INST_CALL_FS:
-	case EG_V_SQ_CF_WORD1_SQ_CF_INST_RETURN:
-	case CM_V_SQ_CF_WORD1_SQ_CF_INST_END:
-		indent(level);
-		fprintf(stderr, "%04d %08X CF ", id, bc->bytecode[id]);
-		fprintf(stderr, "ADDR:%d\n", cf->cf_addr);
-		id++;
-		indent(level);
-		fprintf(stderr, "%04d %08X CF ", id, bc->bytecode[id]);
-		fprintf(stderr, "INST:%X %s ", EG_G_SQ_CF_WORD1_CF_INST(cf->inst), eg_cf_inst_names[EG_G_SQ_CF_WORD1_CF_INST(cf->inst)]);
-		fprintf(stderr, "COND:%X ", cf->cond);
-		fprintf(stderr, "POP_COUNT:%X ", cf->pop_count);
-		fprintf(stderr, "\n");
-		break;
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_JUMP:
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_ELSE:
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_POP:
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_START_NO_AL:
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_END:
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_CONTINUE:
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_BREAK:
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_CALL_FS:
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_RETURN:
+		case CM_V_SQ_CF_WORD1_SQ_CF_INST_END:
+			indent(level);
+			fprintf(stderr, "%04d %08X CF ", id, bc->bytecode[id]);
+			fprintf(stderr, "ADDR:%d\n", cf->cf_addr);
+			id++;
+			indent(level);
+			fprintf(stderr, "%04d %08X CF ", id, bc->bytecode[id]);
+			fprintf(stderr, "INST:%X %s ", EG_G_SQ_CF_WORD1_CF_INST(cf->inst), eg_cf_inst_names[EG_G_SQ_CF_WORD1_CF_INST(cf->inst)]);
+			fprintf(stderr, "COND:%X ", cf->cond);
+			fprintf(stderr, "POP_COUNT:%X ", cf->pop_count);
+			fprintf(stderr, "\n");
+			break;
 	}
 
 }
@@ -652,10 +655,7 @@ void dump_node(struct shader_info * info, struct ast_node * node, int level)
 		break;
 	case NT_IF:
 		indent(level);
-//		R600_DUMP( "IF %s", node->condition?"":"!");
 		R600_DUMP( "IF ");
-//		print_var(node->flow_dep);
-//		R600_DUMP( " THEN ");
 		break;
 	case NT_OP:
 		indent(level);
@@ -959,6 +959,7 @@ void dump_reg_map(struct vmap * map)
 		return;
 
 	R600_DUMP("### REGMAP: ");
+
 	for (int q=0; q< map->count; q++) {
 		print_reg((uintptr_t)map->keys[q*2]);
 		R600_DUMP("-> ");
@@ -980,409 +981,6 @@ void dump_color_set(struct vset * c)
 	}
 	R600_DUMP(" ] ");
 }
-
-
-static void * dot_get_var_val(struct var_desc * v)
-{
-	if (v->chunk)
-		return v->chunk;
-	else {
-		while (v->value_hint)
-			v = v->value_hint;
-		return v;
-	}
-}
-
-static int dot_get_var_node_index(struct vmap * vars, struct var_desc * v)
-{
-	void *d;
-	if (VMAP_GET(vars, dot_get_var_val(v), &d))
-		return (uintptr_t)d;
-
-	return 0;
-}
-
-static void dot_var_id(FILE *f, int idx)
-{
-	fprintf(f, "v%d", idx);
-}
-
-
-// almost the same as fprint_alu_src ( just escape '|' for dot)
-static void dot_alu_src(FILE * f, struct r600_bytecode_alu_src * src)
-{
-	unsigned sel = src->sel, chan = src->chan, rel = src->rel;
-	boolean prchan = true;
-
-	if (src->neg) fprintf(f, "-");
-	if (src->abs) fprintf(f, "\\|");
-
-	if (sel<128) fprintf(f, "R%u", sel);
-	else if (sel<160) fprintf(f, "KC0[%u]", sel-128);
-	else if (sel<192) fprintf(f, "KC1[%u]", sel-160);
-	else if (sel>=512) fprintf(f, "CC%u",sel-512);
-	else if (sel>=256) fprintf(f, "C%u",sel-256);
-	else {
-		//		prchan=false;
-		switch (sel) {
-		case 248: fprintf(f,"0.0f");prchan=false;
-		break;
-		case 249: fprintf(f,"1.0f");prchan=false;
-		break;
-		case 250: fprintf(f,"1");prchan=false;
-		break;
-		case 252: fprintf(f,"0.5f");prchan=false;
-		break;
-		case 253:
-			fprintf(f,"(%f)", *(float*)&src->value);
-			break;
-		case 254: fprintf(f,"PV");
-		break;
-		case 255: fprintf(f,"PS"); prchan=false;
-		break;
-
-		default: fprintf(f,"V%u",sel);
-		}
-	}
-
-	if (rel) {
-		fprintf(f,"[AR]");
-	}
-
-	if (prchan) fprintf(f,".%c",chans[chan]);
-
-	if (src->abs) fprintf(f, "\\|");
-
-}
-
-#define DOT_COLORS_NUM 15
-
-static int dot_colors[DOT_COLORS_NUM * 3] = {
-		0, 0, 0,
-		170, 0, 0,
-		0, 170, 0,
-		170, 85, 0,
-		0, 0, 170,
-		170, 0, 170,
-		0, 170, 170,
-		170, 170, 170,
-		85, 85, 85,
-		255, 0, 0,
-		0, 255, 0,
-		220, 220, 0,
-		0, 0, 255,
-		220, 0, 220,
-		0, 220, 220
-};
-
-static void dot_color(FILE * f, int c)
-{
-	c %= DOT_COLORS_NUM;
-	fprintf(f, "#%02X%02X%02X",
-			dot_colors[c*3 + 0],
-			dot_colors[c*3 + 1],
-			dot_colors[c*3 + 2]);
-}
-
-static void dot_ast_op(FILE *f, struct shader_info * info, struct vmap * vars, struct ast_node * node)
-{
-	boolean grp = false, delay_maps = false;
-	char * name = NULL;
-	int q;
-
-	struct vvec * ins, *outs;
-
-	if (node->flags & AF_DEAD)
-		return;
-
-
-
-	if (node->p_split)
-		ins = node->p_split->ins;
-	else
-		ins = node->ins;
-
-	if (node->p_split_outs)
-		outs = node->p_split_outs->outs;
-	else
-		outs = node->outs;
-
-	if (node->alu) {
-		if (node->alu->is_op3)
-			name = eg_alu_op3_inst_names[node->alu->inst];
-		else
-			name = eg_alu_op2_inst_names[node->alu->inst];
-
-		delay_maps = (node->alu->last == 0);
-
-	} else if (node->cf) {
-		name = eg_cf_inst_names[EG_G_SQ_CF_WORD1_CF_INST(node->cf->inst)];
-
-	} else if (node->tex) {
-		name = eg_tex_inst_names[node->tex->inst];
-	} else if (node->vtx) {
-		name = eg_vtx_inst_names[node->vtx->inst];
-	} else if (node->subtype == NST_ALU_GROUP) {
-		name = eg_alu_op2_inst_names[node->child->child->alu->inst];
-
-		delay_maps = (node->child->rest->rest->rest->child->alu->last == 0);
-	}
-
-	fprintf(f, "node%p [fillcolor=\"#F0FFF0\", label=\"{{", node);
-
-	char delim = ' ';
-
-	struct ast_node * real_node;
-	int real_in=0;
-
-
-	if (ins) {
-		for (q=0; q<ins->count; q++) {
-			struct var_desc * v = ins->keys[q];
-			fprintf(f, "  %c { <i%d> ", delim, q);
-			if (v && !(v->flags & VF_DEAD)) {
-				fprint_var(f, v);
-			}
-
-			fprintf(f, " | ");
-
-			if (node->subtype == NST_ALU_GROUP) {
-				real_node = node->child;
-				int w = q/2;
-				while (w--) real_node = real_node->rest;
-				real_node = real_node->child;
-				real_in = q % 2;
-			} else {
-				real_in = q;
-				real_node = node;
-			}
-
-			if (real_node->alu) {
-				dot_alu_src(f, &real_node->alu->src[real_in]);
-			}
-
-			fprintf(f, "} ");
-
-
-			delim = '|';
-		}
-	}
-
-	fprintf(f,"} | { <op> %s ", name );
-
-	delim = '|';
-
-	if (outs) {
-		for (q=0; q<outs->count; q++) {
-			struct var_desc * v = outs->keys[q];
-			fprintf(f, " | {");
-
-			if (node->subtype == NST_ALU_GROUP) {
-				real_node = node->child;
-				int w = q;
-				while (w--) real_node = real_node->rest;
-				real_node = real_node->child;
-				real_in = 0;
-			} else {
-				real_node = node;
-				real_in = q;
-			}
-
-			if (real_node->alu && real_in==0)
-				fprint_alu_dst(f, &real_node->alu->dst);
-
-			fprintf(f," | <o%d> ", q);
-
-			if (v && !(v->flags & VF_DEAD)) {
-				fprint_var(f, v);
-			}
-
-			fprintf(f," } ");
-
-		}
-	}
-
-	fprintf(f, "}}\"];\n");
-
-	if (grp) {
-		fprintf(f, "}\n");
-	}
-
-	if (ins) {
-		for (q=0; q<ins->count; q++) {
-			struct var_desc * v = ins->keys[q];
-			if (v) {
-				struct ast_node * rdef;
-				struct ast_node * edef;
-
-				if (!VMAP_GET(info->rdefs, v->color, &rdef))
-					rdef = NULL;
-
-				if (!VMAP_GET(info->edefs, dot_get_var_val(v), &edef))
-					edef = NULL;
-
-				if (rdef!=edef) {
-
-					if (rdef)
-						fprintf(f, "node%p:op", rdef);
-					else
-						fprintf(f, "undef");
-
-					fprintf(f, " -> node%p:i%d", node, q);
-
-					fprintf(f, " [color=\"");
-					dot_color(f, v->color);
-					fprintf(f, "\", label=%d, penwidth=5, weight=5]", v->color);
-
-					fprintf(f, ";\n");
-				}
-
-				if (edef) {
-					fprintf(f, "node%p:op", edef);
-					fprintf(f, " -> node%p:i%d", node, q);
-
-					fprintf(f, " [color=\"");
-					dot_color(f, v->color);
-					fprintf(f, "\", label=%d, style=dashed]", v->color);
-
-					fprintf(f, ";\n");
-				} else {
-
-					int i = dot_get_var_node_index(vars, v);
-					if (i) {
-						dot_var_id(f, i);
-						fprintf(f, " -> node%p:i%d", node, q);
-
-						fprintf(f, " [color=\"");
-						dot_color(f, v->color);
-						fprintf(f, "\", label=%d, style=dashed]", v->color);
-
-						fprintf(f, ";\n");
-					}
-				}
-
-			}
-		}
-	}
-
-	if (outs) {
-		for (q=0; q<outs->count; q++) {
-			struct var_desc * v = outs->keys[q];
-			if (v) {
-
-				VMAP_SET(info->p_rdefs, v->color, node);
-				VMAP_SET(info->p_edefs, dot_get_var_val(v), node);
-			}
-		}
-	}
-
-	if (!delay_maps) {
-		int q;
-		for (q=0; q<info->p_rdefs->count; q++) {
-			VMAP_SET(info->rdefs, info->p_rdefs->keys[q*2], info->p_rdefs->keys[q*2+1]);
-		}
-		vmap_clear(info->p_rdefs);
-
-		for (q=0; q<info->p_edefs->count; q++) {
-			VMAP_SET(info->edefs, info->p_edefs->keys[q*2], info->p_edefs->keys[q*2+1]);
-		}
-		vmap_clear(info->p_edefs);
-
-	}
-}
-
-static void dot_from_ast(FILE *f, struct shader_info * info, struct vmap * vars, struct ast_node * node)
-{
-	boolean args = (node->ins || node->outs);
-
-	if (node->subtype != NST_ALU_GROUP) {
-
-		if (node->child)
-			dot_from_ast(f, info, vars, node->child);
-
-		if (node->rest)
-			dot_from_ast(f, info, vars, node->rest);
-
-	}
-
-
-	if (args)
-		dot_ast_op(f, info, vars, node);
-
-}
-
-/* create data flow graph file in the 'dot' format (if path is defined)
- * path should be specified with R600_SHADERS_VIZPATH env var
- * dashed edges - expected data dependencies between instructions,
- * bold solid edges - errors, if they are present (real dependency which is different from expected)
- * (control flow support (loops, ifs) is not implemented yet,)
- */
-void dot_create_file(struct shader_info * info)
-{
-	FILE * f;
-
-	const char * path = debug_get_option("R600_SHADERS_VIZPATH", NULL);
-
-	if (!path)
-		return;
-
-	char * filepath = malloc(strlen(path)+32);
-	int q;
-
-	if (!filepath)
-		return;
-
-	sprintf(filepath, "%s/graph_%d_%c.dot", path, info->shader_index, info->built? 'B' : 'A');
-
-	f = fopen(filepath, "w");
-
-	if (!f)
-		return;
-
-	free(filepath);
-
-	fprintf(f,"digraph g {\n");
-
-	fprintf(f, "node [fontname = Helvetica, style=filled, shape=record];\n");
-
-	fprintf(f, "ranksep = 2;\n");
-	struct vmap * vars = vmap_create(info->vars->count);
-
-	info->rdefs = vmap_create(16);
-	info->edefs = vmap_create(16);
-	info->p_rdefs = vmap_create(16);
-	info->p_edefs = vmap_create(16);
-
-	for (q=0; q<info->vars->count; q++) {
-		struct var_desc * v = info->vars->keys[q*2+1];
-
-		if (v->flags & VF_DEAD)
-			continue;
-
-		if (v->def == NULL) {
-
-			VMAP_SET(vars, dot_get_var_val(v), q+1);
-
-			dot_var_id(f, q+1);
-			fprintf(f, " [fillcolor=\"#E0E0F0\", label=\"");
-			fprint_var(f, v);
-			fprintf(f, "\"];\n");
-
-		}
-	}
-
-	dot_from_ast(f, info, vars, info->root);
-
-	fprintf(f,"}\n");
-
-	fclose(f);
-
-	vmap_destroy(info->edefs);
-	vmap_destroy(info->rdefs);
-	vmap_destroy(info->p_edefs);
-	vmap_destroy(info->p_rdefs);
-}
-
 
 void dump_bytecode(struct shader_info * info)
 {

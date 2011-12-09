@@ -32,3 +32,6 @@ config.py
 build
 manifest.txt
 .dir-locals.el
+.cproject
+.project
+.settings
