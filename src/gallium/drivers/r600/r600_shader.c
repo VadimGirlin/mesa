@@ -924,10 +924,10 @@ static unsigned r600_tex_from_byte_stream(struct r600_shader_ctx *ctx,
 	tex.src_rel = bytes[bytes_read++];
 	tex.dst_gpr = bytes[bytes_read++];
 	tex.dst_rel = bytes[bytes_read++];
-	tex.dst_sel_x = bytes[bytes_read++];
-	tex.dst_sel_y = bytes[bytes_read++];
-	tex.dst_sel_z = bytes[bytes_read++];
-	tex.dst_sel_w = bytes[bytes_read++];
+	tex.dst_sel[0] = bytes[bytes_read++];
+	tex.dst_sel[1] = bytes[bytes_read++];
+	tex.dst_sel[2] = bytes[bytes_read++];
+	tex.dst_sel[3] = bytes[bytes_read++];
 	tex.lod_bias = bytes[bytes_read++];
 	tex.coord_type_x = bytes[bytes_read++];
 	tex.coord_type_y = bytes[bytes_read++];
@@ -937,10 +937,10 @@ static unsigned r600_tex_from_byte_stream(struct r600_shader_ctx *ctx,
 	tex.offset_y = bytes[bytes_read++];
 	tex.offset_z = bytes[bytes_read++];
 	tex.sampler_id = bytes[bytes_read++];
-	tex.src_sel_x = bytes[bytes_read++];
-	tex.src_sel_y = bytes[bytes_read++];
-	tex.src_sel_z = bytes[bytes_read++];
-	tex.src_sel_w = bytes[bytes_read++];
+	tex.src_sel[0] = bytes[bytes_read++];
+	tex.src_sel[1] = bytes[bytes_read++];
+	tex.src_sel[2] = bytes[bytes_read++];
+	tex.src_sel[3] = bytes[bytes_read++];
 
 	r600_bytecode_add_tex(ctx->bc, &tex);
 
