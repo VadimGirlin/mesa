@@ -1636,6 +1636,7 @@ AC_SUBST([LLVM_CFLAGS])
 AC_SUBST([LLVM_CXXFLAGS])
 AC_SUBST([LLVM_LIBS])
 AC_SUBST([LLVM_LDFLAGS])
+AC_SUBST([LLVM_INCLUDEDIR])
 AC_SUBST([LLVM_VERSION])
 
 case "x$enable_opengl$enable_gles1$enable_gles2" in
@@ -1763,6 +1764,7 @@ if test "x$enable_gallium_llvm" = xyes; then
 	LLVM_LDFLAGS=`$LLVM_CONFIG --ldflags`
 	LLVM_BINDIR=`$LLVM_CONFIG --bindir`
 	LLVM_CXXFLAGS=`$LLVM_CONFIG --cxxflags`
+	LLVM_INCLUDEDIR=`$LLVM_CONFIG --includedir`
 	DEFINES="$DEFINES -D__STDC_CONSTANT_MACROS"
 	MESA_LLVM=1
     else

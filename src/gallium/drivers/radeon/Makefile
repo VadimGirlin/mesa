@@ -9,13 +9,12 @@ LIBNAME = radeon
 LIBRARY_INCLUDES = -I$(TOP)/include
 
 TBLGEN = $(LLVM_BINDIR)/tblgen
-TABLEGEN_INCLUDES = /usr/local/include
 
 CXXFLAGS+= $(LLVM_CXXFLAGS)
 
 include ../../Makefile.template
 
-tablegen = $(TBLGEN) -I $(TABLEGEN_INCLUDES) $1 $2 -o $3
+tablegen = $(TBLGEN) -I $(LLVM_INCLUDEDIR) $1 $2 -o $3
 
 gen: $(GENERATED_SOURCES)
 
