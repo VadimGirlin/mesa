@@ -1619,10 +1619,8 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 				int slot = -1, chan=-1;
 				unsigned rc;
 
-				assert(out || (n->flags & AF_KEEP_ALIVE));
-
 				/* if the instruction doesn't define live out var - we are free to choose any slot */
-				if ((n->flags & AF_KEEP_ALIVE) || (out->flags & VF_DEAD)) {
+				if (!out || (n->flags & AF_KEEP_ALIVE) || (out->flags & VF_DEAD)) {
 					rc=0;
 					chan=-1;
 				} else {

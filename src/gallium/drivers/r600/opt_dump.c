@@ -69,6 +69,7 @@ char * eg_alu_op2_inst_names[256] =
 
 char * eg_alu_op3_inst_names[256] =
 {
+		[EG_V_SQ_ALU_WORD1_OP3_SQ_OP3_INST_CNDE] = "CNDE",
 		[EG_V_SQ_ALU_WORD1_OP3_SQ_OP3_INST_CNDGT] = "CNDGT",
 		[EG_V_SQ_ALU_WORD1_OP3_SQ_OP3_INST_CNDGE] = "CNDGE",
 		[EG_V_SQ_ALU_WORD1_OP3_SQ_OP3_INST_MULADD] = "MULADD",

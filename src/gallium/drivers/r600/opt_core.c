@@ -41,7 +41,8 @@ static void destroy_var(struct var_desc * v)
 
 int is_alu_kill_inst(struct r600_bytecode * bc, struct r600_bytecode_alu *alu)
 {
-	return (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_KILLE ||
+	return !alu->is_op3 &&
+			(alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_KILLE ||
 			alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_KILLE_INT ||
 			alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_KILLGE ||
 			alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_KILLGE_INT ||
@@ -365,7 +366,7 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 
 		boolean write = (alu->dst.write==1) || alu->is_op3;
 
-		if (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOVA_INT)
+		if (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOVA_INT && !alu->is_op3)
 			an->outs->keys[0] = get_var(info, REG_AR, 0, 0);
 		else
 			an->outs->keys[0] = (alu->dst.sel<128 && write) ? get_var(info, alu->dst.sel, alu->dst.chan, 0) : NULL;
@@ -373,7 +374,7 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 		if (alu->dst.rel)
 			return 0;
 
-		if (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOV)
+		if (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOV && !alu->is_op3)
 			an->flags |= AF_COPY_HINT;
 
 		if (alu->dst.clamp)
@@ -382,9 +383,9 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 		if (is_alu_four_slots_inst(&info->shader->bc, alu)) {
 			an->flags |= AF_FOUR_SLOTS_INST;
 
-			if (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_XY ||
+			if (!alu->is_op3 && (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_XY ||
 					alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INTERP_ZW ||
-					alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_CUBE)
+					alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_CUBE))
 				an->flags |= AF_CHAN_CONSTRAINT;
 		} else if (is_alu_kill_inst(&info->shader->bc, alu))
 			an->flags |= AF_KEEP_ALIVE;
