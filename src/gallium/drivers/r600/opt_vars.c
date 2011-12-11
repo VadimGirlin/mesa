@@ -61,6 +61,12 @@ struct vvec * vvec_create_clean(unsigned initial_size)
 	return s;
 }
 
+void vvec_append(struct vvec * s, void * key)
+{
+	vvec_set_size(s, s->count+1);
+	s->keys[s->count-1] = key;
+}
+
 void vvec_set_size(struct vvec * s, unsigned new_size)
 {
 	if (new_size != s->count) {

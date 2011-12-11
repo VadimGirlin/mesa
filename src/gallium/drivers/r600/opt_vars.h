@@ -118,13 +118,6 @@ struct reg_desc
 	int chan;
 };
 
-/* list node for storing all uses for variable */
-struct use_desc
-{
-	struct ast_node * use;
-	struct use_desc * next;
-};
-
 enum var_flags
 {
 	VF_NONE = 0,
@@ -178,7 +171,7 @@ struct var_desc
 
 	/* use/def data */
 	struct ast_node * def;
-	struct use_desc * uses;
+	struct vset * uses;
 
 	/* points to the value source (e.g for MOV a,b - a->value_hint==b */
 	struct var_desc * value_hint;
@@ -277,6 +270,7 @@ struct vque {
 struct vvec * vvec_create(unsigned initial_size);
 struct vvec * vvec_create_clean(unsigned initial_size);
 void vvec_set_size(struct vvec * s, unsigned new_size);
+void vvec_append(struct vvec * s, void * key);
 void vvec_destroy(struct vvec * s);
 boolean vvec_contains(struct vvec * s, void * key);
 struct vvec * vvec_createcopy(struct vvec * s);

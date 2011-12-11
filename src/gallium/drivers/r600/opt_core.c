@@ -29,12 +29,7 @@
 static void destroy_var(struct var_desc * v)
 {
 	vset_destroy(v->interferences);
-
-	while (v->uses) {
-		struct use_desc * u = v->uses;
-		v->uses = u->next;
-		free(u);
-	}
+	vset_destroy(v->uses);
 
 	free(v);
 }
@@ -868,10 +863,11 @@ static struct var_desc * rename_var(struct shader_info * info, struct var_desc *
 
 static void add_use(struct var_desc * v, struct ast_node * node)
 {
-	struct use_desc * u = calloc(1, sizeof(struct use_desc));
-	u->use = node;
-	u->next = v->uses;
-	v->uses = u;
+
+	if (!v->uses)
+		v->uses = vset_create(4);
+
+	vset_add(v->uses, node);
 }
 
 static void rename_phi_operand(struct shader_info * info, int n, struct ast_node * phi, struct vmap * renames)
@@ -1631,22 +1627,24 @@ static void check_copy2(struct shader_info * info, struct var_desc * v)
 	R600_DUMP( "\n");
 
 	if (vdef && (vdef->flags & AF_ALU_CLAMP_DST) && s->def && sdef->alu && !(sdef->flags & AF_ALU_CLAMP_DST)) {
-		struct use_desc * u = s->uses;
 		boolean can_propagate = true;
+		int q;
 
 		R600_DUMP( "check_copy2: clamp propagation: checking src usage ...\n");
 
-		while (u) {
-			if (u->use != v->def) {
-				if (!(u->use->flags & AF_DEAD) && (!(u->use->flags & AF_COPY_HINT) || !(u->use->flags & AF_ALU_CLAMP_DST))) {
-					can_propagate = false;
-					R600_DUMP( "check_copy2: can't propagate ");
-					dump_node(info, u->use, 0);
-					break;
+		if (s->uses) {
+			for (q=0; q<s->uses->count; q++) {
+				struct ast_node * u = s->uses->keys[q];
+
+				if (u != v->def) {
+					if (!(u->flags & AF_DEAD) && (!(u->flags & AF_COPY_HINT) || !(u->flags & AF_ALU_CLAMP_DST))) {
+						can_propagate = false;
+						R600_DUMP( "check_copy2: can't propagate ");
+						dump_node(info, u, 0);
+						break;
+					}
 				}
 			}
-
-			u = u->next;
 		}
 
 		if (can_propagate)
@@ -1707,13 +1705,17 @@ static void analyze_vars(struct shader_info * info)
 					v->flags |= VF_PIN_CHAN;
 				}
 			} else {
-				struct use_desc * u = v->uses;
-				while (u) {
-					if (u->use->flags & AF_CHAN_CONSTRAINT) {
-						v->flags |= VF_PIN_CHAN;
-						break;
+				int q;
+
+				if (v->uses) {
+					for (q=0; q<v->uses->count; q++) {
+						struct ast_node * u = v->uses->keys[q];
+
+						if (u->flags & AF_CHAN_CONSTRAINT) {
+							v->flags |= VF_PIN_CHAN;
+							break;
+						}
 					}
-					u = u->next;
 				}
 			}
 
