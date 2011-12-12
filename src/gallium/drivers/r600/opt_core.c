@@ -1516,7 +1516,7 @@ static void node_liveness(struct ast_node * node, struct vset * live)
 			vset_addvec(live,node->ins);
 
 	if (node->p_split)
-		node_liveness(node->p_split, live);
+		node_ps_liveness(node->p_split, live);
 
 	if (node->loop_phi) {
 		outs_dead(node->loop_phi, live);
@@ -2402,6 +2402,224 @@ static int build_shader(struct shader_info * info)
 	return 0;
 }
 
+static float clamp(float f)
+{
+	return f<0.0f ? 0.0f : f>1.0f ? 1.0f : f;
+}
+
+static float get_const_val(struct r600_bytecode_alu_src * s)
+{
+	const uint32_t db = 0xdeadbeef;
+	float val;
+
+	switch (s->sel) {
+	case V_SQ_ALU_SRC_LITERAL:
+		val = *(float*)&s->value;
+		break;
+	case V_SQ_ALU_SRC_0:
+		val = 0.0f;
+		break;
+	case V_SQ_ALU_SRC_0_5:
+		val = 0.5f;
+		break;
+	case V_SQ_ALU_SRC_1:
+		val = 1.0f;
+		break;
+	default:
+		val = *(float*)&db;
+	}
+
+	if (s->abs)
+		val = val<0? -val : val;
+
+	if (s->neg)
+		val = -val;
+
+	return val;
+}
+
+static void get_group_instructions(struct ast_node * n, struct ast_node *  gg[4])
+{
+	struct ast_node * p;
+	int q = 0;
+
+	assert(n->flags & AF_FOUR_SLOTS_INST);
+
+	p = n->parent->parent;
+
+	while (p->subtype != NST_ALU_GROUP)
+		p = p->parent;
+
+	p = p->child;
+
+	while (p) {
+		gg[q++] = p->child;
+		p = p->rest;
+	}
+}
+
+static boolean propagate_copy_input(struct shader_info * info, struct ast_node * node,
+		int index, struct ast_node * m)
+{
+
+
+	if (node->subtype == NST_ALU_INST) {
+		struct r600_bytecode_alu_src * d = &node->alu->src[index], *src = &m->alu->src[0];
+		unsigned nneg = src->neg, nabs = src->abs;
+		struct var_desc * sv = m->ins->keys[0];
+
+		R600_DUMP("prop copy %d ", index);
+		if (sv)
+			print_var(sv);
+		dump_node(info, node, 0);
+
+		if (!sv && src->sel>=512 && node->const_ins_count == 2) {
+			int t, k=0;
+
+			for (t=0; t<node->ins->count; t++) {
+				if (t==index)
+					continue;
+
+				if (node->alu->src[t].sel>=512)
+					if (++k == 2)
+						return false;
+			}
+		}
+
+		if (d->abs) {
+			nneg = 0;
+			nabs = 1;
+		}
+
+		if (d->neg)
+			nneg = !nneg;
+
+
+		d->neg = nneg;
+		d->abs = nabs;
+
+		if (sv) {
+			if (m->flags & AF_ALU_CLAMP_DST)
+				return false;
+
+			node->ins->keys[index] = sv;
+		} else {
+
+			d->value = src->value;
+
+			if (m->flags & AF_ALU_CLAMP_DST) {
+				if (src->sel>=512)
+					return false;
+				else if (src->sel == V_SQ_ALU_SRC_LITERAL) {
+					d->value = clamp(d->value);
+				}
+			}
+
+			if (node->flags & AF_FOUR_SLOTS_INST && src->sel>=512) {
+				struct ast_node * g[4];
+				struct vset * csel = vset_create(3);
+				int w,e;
+
+				VSET_ADD(csel, CPAIR_KEY(src->sel,src->chan));
+
+				get_group_instructions(node, g);
+
+				for (w=0; w<4; w++) {
+					struct ast_node * r = g[w];
+					for (e=0; e<r->ins->count; e++) {
+						if (r->alu->src[e].sel>=512) {
+							VSET_ADD(csel, CPAIR_KEY(r->alu->src[e].sel,r->alu->src[e].chan));
+
+							if (csel->count>2)
+								return false;
+						}
+					}
+				}
+
+				vset_destroy(csel);
+			}
+
+
+			d->sel = src->sel;
+			d->chan = src->chan;
+			node->ins->keys[index] = NULL;
+			node->const_ins_count++;
+		}
+
+		if (node->flags & AF_FOUR_SLOTS_INST) {
+			struct ast_node * p = node->parent;
+			int ch = node->alu->dst.chan;
+			int pn = ch*2+index;
+
+			while (p->subtype != NST_ALU_GROUP)
+				p = p->parent;
+
+			p->p_split->outs->keys[pn] = node->ins->keys[index];
+			p->p_split->ins->keys[pn] = node->ins->keys[index];
+		}
+
+		return true;
+	} else if (node->subtype == NST_CF_INST && node->cf->output.burst_count==1) {
+		struct r600_bytecode_alu_src * src = &m->alu->src[0];
+
+		if (src->sel >= 248 && src->sel<=253) {
+			float val = get_const_val(src);
+
+			if (val == 0.0f) {
+				node->ins->keys[index] = NULL;
+				node->cf->output.swizzle[index] = 4;
+			} else if (val == 1.0f) {
+				node->ins->keys[index] = NULL;
+				node->cf->output.swizzle[index] = 5;
+			}
+		}
+
+		return node->ins->keys[index] == NULL;
+
+	}
+
+	return false;
+}
+
+
+static void propagate_copy_node(struct shader_info * info, struct ast_node * node)
+{
+	if (node->ins) {
+		int q;
+
+		for (q=0; q<node->ins->count; q++) {
+			struct var_desc * v = node->ins->keys[q], *vv;
+
+			if (!v || (v->flags & VF_DEAD))
+				continue;
+
+			vv = v->value_hint ? v->value_hint : v;
+
+			 if (!vv->def)
+				 continue;
+
+			if (vv->def->alu && !vv->def->alu->is_op3 &&
+					vv->def->alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOV) {
+
+				if (propagate_copy_input(info, node, q, vv->def))
+					vset_remove(vv->uses, node);
+			}
+		}
+	}
+
+	if (node->child)
+		propagate_copy_node(info, node->child);
+
+	if (node->rest)
+		propagate_copy_node(info, node->rest);
+
+}
+
+static void propagate_copy(struct shader_info * info)
+{
+	propagate_copy_node(info, info->root);
+}
+
 static boolean create_shader_tree(struct shader_info * info)
 {
 	info->vars = vmap_create(32);
@@ -2424,6 +2642,11 @@ static boolean create_shader_tree(struct shader_info * info)
 
 	build_ssa(info);
 	liveness(info);
+
+	propagate_copy(info);
+	reset_interferences(info);
+	liveness(info);
+
 	analyze_vars(info);
 
 	/* global scheduling (initial support - fetch combining etc) */

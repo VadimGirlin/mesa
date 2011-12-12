@@ -46,6 +46,8 @@ struct shader_info;
 
 #define REGCHAN_KEY(reg,chan) (((reg)<<2)+((chan)&3)+1)
 
+#define CPAIR_KEY(idx,chan) (((idx)<<1)+((chan>>1)+1))
+
 #define KEY_REG(key) (((key)-1)>>2)
 #define KEY_CHAN(key) (((key)-1)&3)
 
