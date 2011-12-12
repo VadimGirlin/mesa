@@ -53,10 +53,10 @@ struct shader_info;
 
 /* affinity costs (for coalescing, see opt_color.[ch] */
 #define AE_SPLIT_COST		1000000
-#define AE_INPUT_COST		100000
+#define AE_INPUT_COST		10000
 #define AE_CSPLIT_COST		10000
 #define AE_CONSTRAINT_COST	1000
-#define AE_PHI_COST			100
+#define AE_PHI_COST			100000
 #define AE_COPY_COST		1
 
 /* priorities (see comments for prio_get_node_subtype, calc_prio) */

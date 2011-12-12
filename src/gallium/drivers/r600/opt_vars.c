@@ -291,6 +291,11 @@ void vset_clear(struct vset * s)
 
 void vset_copy(struct vset * s, struct vset * from)
 {
+	if (!from) {
+		vset_clear(s);
+		return;
+	}
+
 	s->count=from->count;
 	vset_resize(s);
 	memcpy(s->keys, from->keys, s->count * sizeof(void *));

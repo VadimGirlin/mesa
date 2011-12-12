@@ -212,6 +212,7 @@ static boolean parse_cf_tex(struct shader_info * info, struct ast_node * node, s
 				tex->inst == SQ_TEX_INST_SET_GRADIENTS_V)
 			tn->flags |= AF_KEEP_ALIVE;
 
+		tn->flow_dep = get_var(info, REG_AM, 0, 0);
 	}
 	return true;
 }
@@ -251,6 +252,9 @@ static boolean parse_cf_vtx(struct shader_info * info, struct ast_node * node, s
 			tn->outs->keys[q] = vtx->dst_sel[q] < 4 ? get_var(info, vtx->dst_gpr, vtx->dst_sel[q], 0) : NULL;
 
 		tn->flags |= AF_REG_CONSTRAINT;
+
+		tn->flow_dep = get_var(info, REG_AM, 0, 0);
+
 	}
 	return true;
 }
@@ -496,6 +500,8 @@ static struct ast_node * parse_cf(struct shader_info * info, struct ast_node * c
 				memcpy(ln->child->cf, cfn->cf, sizeof(struct r600_bytecode_cf));
 				ln->child->parent = ln;
 
+				cfn->cf->output.inst = EG_V_SQ_CF_ALLOC_EXPORT_WORD1_SQ_CF_INST_EXPORT;
+
 				cfn = ln->child;
 
 				cfn->cf->output.gpr++;
@@ -648,8 +654,14 @@ static struct ast_node * convert_cf_if(struct shader_info * info, struct ast_nod
 
 		root->outs = vvec_create(1);
 		root->outs->keys[0] = get_var(info, REG_AM, 0,0);
-
 		root->flow_dep = get_var(info, REG_AM, 0,0);
+
+		n_else = n_else->child;
+
+		n_else->outs = vvec_create(1);
+		n_else->outs->keys[0] = get_var(info, REG_AM, 0,0);
+		n_else->flow_dep = get_var(info, REG_AM, 0,0);
+
 
 		/* FIXME: set the condition correctly */
 
@@ -721,9 +733,19 @@ static int convert_cf_loop(struct shader_info * info, struct ast_node * root)
 	return 0;
 }
 
-static void convert_loop_ops(struct shader_info * info, struct ast_node * root, boolean brk)
+static struct ast_node * find_block_start(struct ast_node * node)
 {
-	struct ast_node * p=root->parent;
+	struct ast_node * prev;
+	do {
+		prev = node;
+		node = node->parent;
+	} while (node->type != NT_REGION && node->type != NT_IF && node->type!= NT_DEPART && node->type != NT_REPEAT);
+	return prev;
+}
+
+static void convert_loop_ops(struct shader_info * info, struct ast_node * node, boolean brk)
+{
+	struct ast_node * p=node->parent;
 
 	while (p && p->repeat_count==0)
 		p=p->parent;
@@ -733,23 +755,38 @@ static void convert_loop_ops(struct shader_info * info, struct ast_node * root, 
 
 	assert(p->type == NT_REGION);
 
-	root->target=p->label;
-	root->target_node = p;
+	node->target=p->label;
+	node->target_node = p;
 
-	root->outs = vvec_create(1);
-	root->outs->keys[0] = get_var(info, REG_AM, 0,0);
+	node->outs = vvec_create(1);
+	node->outs->keys[0] = get_var(info, REG_AM, 0,0);
 
-	root->flow_dep = get_var(info, REG_AM, 0,0);
+	node->flow_dep = get_var(info, REG_AM, 0,0);
 
 	if (brk) {
-		root->type = NT_DEPART;
-		root->subtype = NST_LOOP_BREAK;
-		root->depart_number=++p->depart_count;
+		node->type = NT_DEPART;
+		node->subtype = NST_LOOP_BREAK;
+		node->depart_number=++p->depart_count;
 	} else {
-		root->type = NT_REPEAT;
-		root->subtype = NST_LOOP_CONTINUE;
-		root->repeat_number=++p->repeat_count;
+		node->type = NT_REPEAT;
+		node->subtype = NST_LOOP_CONTINUE;
+		node->repeat_number=++p->repeat_count;
 	}
+
+	p = find_block_start(node);
+
+	if (p == node->parent || p == node)
+		return;
+
+	node->child = p;
+
+	node->parent->parent->rest = NULL;
+
+	p->parent->child = node;
+
+	node->parent = p->parent;
+	p->parent = node;
+
 }
 
 static int convert_cf(struct shader_info * info, struct ast_node * root)
@@ -1291,18 +1328,24 @@ static void ssa(struct shader_info * info, struct ast_node * node, struct vmap *
 	break;
 
 	case NT_REPEAT:
-		ssa(info, node->child, renames);
+	{
+		struct vmap * new_renames = vmap_createcopy(renames);
+
+		ssa(info, node->child, new_renames);
 		ssa_ins(info, node, renames);
 		ssa_outs(info, node, renames, NULL);
 
 		if (node->target_node && node->target_node->loop_phi) {
 			struct ast_node * p = node->target_node->loop_phi;
 			while (p && p->child) {
-				rename_phi_operand(info, node->repeat_number+1, p->child, renames);
+				rename_phi_operand(info, node->repeat_number+1, p->child, new_renames);
 				p = p->rest;
 			}
 		}
-		break;
+
+		vmap_destroy(new_renames);
+	}
+	break;
 
 	case NT_LIST:
 		ssa(info, node->child, renames);
@@ -1415,10 +1458,11 @@ static void outs_dead(struct ast_node * node, struct vset * live)
 	if (node->outs) {
 		if (!vset_removevec(live, node->outs))
 			node->flags |= AF_DEAD;
-		else
+		else {
 			node->flags &= ~AF_DEAD;
+			update_ins_liveness(node);
+		}
 
-		update_ins_liveness(node);
 	}
 }
 
@@ -1505,14 +1549,20 @@ static void node_liveness(struct ast_node * node, struct vset * live)
 	if (node->type == NT_IF && node->phi)
 		live_phi_branch(node->phi, live, 2);
 
-	if (node->type == NT_REPEAT && node->target_node->loop_phi)
+	if (node->type == NT_REPEAT && node->target_node->loop_phi) {
+		vset_copy(live, node->target_node->vars_live);
 		live_phi_branch(node->target_node->loop_phi, live, node->repeat_number+1);
+	}
 
 	if (node->rest)
 		node_liveness(node->rest, live);
 
-	if (node->child)
+	if (node->child) {
+		if (node->child->type == NT_REGION && node->child->vars_live)
+			vset_clear(node->child->vars_live);
+
 		node_liveness(node->child, live);
+	}
 
 	if (node->type == NT_IF) {
 		vset_addset(live, node->vars_live_after);
@@ -1553,6 +1603,11 @@ static void node_liveness(struct ast_node * node, struct vset * live)
 
 	if (node->loop_phi) {
 		outs_dead(node->loop_phi, live);
+
+		if (node->vars_live)
+			vset_copy(node->vars_live, live);
+		else
+			node->vars_live = vset_createcopy(live);
 
 		if (node->child)
 			node_liveness(node->child, live);
@@ -1967,7 +2022,7 @@ static void set_regs(struct shader_info * info, struct ast_node * node)
 					}
 					ssel = KEY_CHAN(rc);
 				} else
-					ssel = 7;
+					continue;
 
 				node->tex->src_sel[q] = ssel;
 			}
@@ -2162,8 +2217,6 @@ static void reset_interferences(struct shader_info * info)
 	}
 }
 
-
-
 static void push_stack(struct shader_info * info)
 {
 	if (++info->stack_level > info->bc->nstack)
@@ -2180,9 +2233,16 @@ static void build_shader_node(struct shader_info * info, struct ast_node * node)
 
 static void emit_if_else(struct shader_info * info, struct ast_node * node)
 {
-	struct ast_node * n_if = node->child->child->child->child->child;
-	struct ast_node * n_else = node->child->child->rest->rest;
+	struct ast_node * depart = node->child->child;
+	struct ast_node * n_if;
+	struct ast_node * n_else;
 	struct r600_bytecode_cf * cf_if_jump, * cf_if_else, * cf_if_pop;
+
+	if (!depart || !depart->child)
+		return;
+
+	n_if = depart->child->child->child;
+	n_else = depart->child->rest;
 
 	r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_JUMP);
 	cf_if_jump = info->bc->cf_last;
@@ -2527,6 +2587,8 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 		if (d->neg)
 			nneg = !nneg;
 
+		if (nabs && node->alu->is_op3)
+			return false;
 
 		d->neg = nneg;
 		d->abs = nabs;
@@ -2563,8 +2625,10 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 						if (r->alu->src[e].sel>=512) {
 							VSET_ADD(csel, CPAIR_KEY(r->alu->src[e].sel,r->alu->src[e].chan));
 
-							if (csel->count>2)
+							if (csel->count>2) {
+								vset_destroy(csel);
 								return false;
+							}
 						}
 					}
 				}
@@ -2574,7 +2638,7 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 
 
 			d->sel = src->sel;
-			d->chan = src->chan;
+			d->chan = (src->sel>=512) ? src->chan : 0;
 			node->ins->keys[index] = NULL;
 			node->const_ins_count++;
 		}
@@ -2609,6 +2673,22 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 
 		return node->ins->keys[index] == NULL;
 
+	} else if (node->subtype == NST_TEX_INST) {
+		struct r600_bytecode_alu_src * src = &m->alu->src[0];
+
+		if (src->sel >= 248 && src->sel<=253) {
+			float val = get_const_val(src);
+
+			if (val == 0.0f) {
+				node->ins->keys[index] = NULL;
+				node->tex->src_sel[index] = 4;
+			} else if (val == 1.0f) {
+				node->ins->keys[index] = NULL;
+				node->tex->src_sel[index] = 5;
+			}
+		}
+
+		return node->ins->keys[index] == NULL;
 	}
 
 	return false;
@@ -2766,7 +2846,7 @@ int r600_shader_optimize(struct r600_pipe_context * rctx, struct r600_pipe_shade
 	 *  	2 - inverted 1 (skip for all others)
 	 */
 	static int skip_mode = 0;
-	static int skip_num = 122;
+	static int skip_num = 5;
 	static int skip_cnt = 1;
 
 	if (skip_mode) {

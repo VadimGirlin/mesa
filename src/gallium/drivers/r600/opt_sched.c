@@ -51,7 +51,7 @@ static void update_interferences(struct vset * live)
 
 static void gs_enqueue_blocks(struct shader_info * info, struct vque * blocks, struct ast_node * node)
 {
-	if (node->type == NT_OP || node->type == NT_REGION || node->type == NT_IF
+	if (node->type == NT_OP || node->type == NT_REGION || node->type == NT_IF || node->type == NT_REPEAT || node->type==NT_DEPART
 			|| node->subtype == NST_ALU_GROUP) {
 
 		node->parent->child = NULL;
@@ -82,7 +82,7 @@ static struct ast_node * gs_create_list(struct shader_info * info, struct vque *
 	int q;
 	struct ast_node * list = NULL, * clause = NULL, * lc;
 	boolean last_alu = false;
-	unsigned last_alu_prio=0, nalu = 0;
+	unsigned /*last_alu_prio=0,*/ nalu = 0;
 
 	for (q=0; q<blocks->count; q++) {
 		struct ast_node * n = blocks->keys[q*2+1];
@@ -92,8 +92,8 @@ static struct ast_node * gs_create_list(struct shader_info * info, struct vque *
 		dump_node(info, n, 0);
 
 		if (alu) {
-			if (n->subtype == NST_ALU_INST) {
-				boolean new_group = (n->min_prio!=last_alu_prio) || (nalu==info->max_slots-1);
+			if (n->subtype == NST_ALU_INST || n->subtype == NST_COPY) {
+				boolean new_group = /*(n->min_prio!=last_alu_prio) ||*/ (nalu==info->max_slots-1);
 
 				if (new_group) {
 					n->alu->last = 1;
@@ -101,11 +101,11 @@ static struct ast_node * gs_create_list(struct shader_info * info, struct vque *
 				} else
 					n->alu->last = 0;
 
-				last_alu_prio = n->min_prio;
+				/* last_alu_prio = n->min_prio; */
 				nalu++;
 
-			} else
-				last_alu_prio = 0;
+			} /*else
+				last_alu_prio = 0; */
 
 			if (!last_alu) {
 
@@ -166,13 +166,16 @@ static void gs_schedule_node(struct shader_info * info, struct ast_node * node)
 	struct ast_node * list;
 	int q;
 
-	gs_enqueue_blocks(info, blocks, node);
+	gs_enqueue_blocks(info, blocks, node->child);
 
 	R600_DUMP("\n##QUEUED BLOCKS:\n");
 
 	for (q=blocks->count-1; q>=0; q--) {
 		struct ast_node * n = blocks->keys[q*2+1];
 		dump_node(info, n, 0);
+
+		if (n->child && (n->type == NT_REGION || n->type == NT_REPEAT || n->type == NT_DEPART || n->type==NT_IF))
+			gs_schedule_node(info, n);
 	}
 
 	R600_DUMP("##QUEUED BLOCKS END\n\n");
@@ -183,6 +186,8 @@ static void gs_schedule_node(struct shader_info * info, struct ast_node * node)
 
 	destroy_ast(node->child);
 	node->child = list;
+	if (list)
+		list->parent = node;
 }
 
 /* collect the sets of used vars for every block (region) */
