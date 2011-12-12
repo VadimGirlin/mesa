@@ -456,28 +456,60 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 	return insn;
 }
 
-static void parse_cf(struct shader_info * info, struct ast_node * cfn)
+static struct ast_node * parse_cf(struct shader_info * info, struct ast_node * cfn)
 {
 	struct r600_bytecode_cf * cf = cfn->cf;
 
 	if (cf->inst == EG_V_SQ_CF_ALLOC_EXPORT_WORD1_SQ_CF_INST_EXPORT ||
 			cf->inst == EG_V_SQ_CF_ALLOC_EXPORT_WORD1_SQ_CF_INST_EXPORT_DONE) {
 
-		unsigned count =  cf->output.burst_count, q;
+		unsigned count =  cf->output.burst_count, q, w;
+		struct ast_node * ln = NULL;
 
-		cfn->ins = vvec_create(count*4);
 
-		for (q=0; q<count*4; q++)
-			cfn->ins->keys[q] = (cf->output.swizzle[q&3]<4) ?
-					get_var(info, cf->output.gpr+(q>>2), cf->output.swizzle[q&3], 0) : NULL;
+		cfn->cf->output.burst_count = 1;
 
-		cfn->type = NT_OP;
-		cfn->flags |= AF_REG_CONSTRAINT;
+		for (w = 0; w<count; w++) {
+
+			cfn->ins = vvec_create(4);
+
+			for (q=0; q<4; q++)
+				cfn->ins->keys[q] = (cf->output.swizzle[q]<4) ?
+						get_var(info, cf->output.gpr+w, cf->output.swizzle[q], 0) : NULL;
+
+			cfn->type = NT_OP;
+			cfn->flags |= AF_REG_CONSTRAINT;
+
+			if (w<count-1) {
+				if (ln) {
+					ln->rest = create_node(NT_LIST);
+					ln->rest->parent = ln;
+					ln = ln->rest;
+				} else {
+					ln = create_node(NT_LIST);
+					ln->parent = cfn->parent;
+					cfn->parent->rest = ln;
+				}
+
+				ln->child = create_node(NT_OP);
+				ln->child->cf = malloc(sizeof(struct r600_bytecode_cf));
+				memcpy(ln->child->cf, cfn->cf, sizeof(struct r600_bytecode_cf));
+				ln->child->parent = ln;
+
+				cfn = ln->child;
+
+				cfn->cf->output.gpr++;
+				cfn->cf->output.array_base++;
+			}
+		}
+
 
 	} else if (cf->inst == EG_V_SQ_CF_WORD1_SQ_CF_INST_CALL_FS) {
 		cfn->outs = vvec_create(1);
 		cfn->outs->keys[0] = get_var(info, REG_AM, 0, 0);
 	}
+
+	return cfn;
 }
 
 static boolean parse_shader(struct shader_info * info, struct ast_node * root)
@@ -496,13 +528,14 @@ static boolean parse_shader(struct shader_info * info, struct ast_node * root)
 		node->child = cfn;
 		cfn->parent = node;
 
-		node->rest = create_node(NT_LIST);
-		node->rest->parent = node;
-
 		cfn->cf = cf;
 		cfn->label = cf->id;
 
-		parse_cf(info, cfn);
+		cfn = parse_cf(info, cfn);
+		node = cfn->parent;
+
+		node->rest = create_node(NT_LIST);
+		node->rest->parent = node;
 
 		if (!LIST_IS_EMPTY(&cf->alu)) {
 
