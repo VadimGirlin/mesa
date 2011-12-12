@@ -67,7 +67,7 @@ AMDILGenIntrinsics.inc: *.td
 	$(call tablegen, -gen-tgt-intrinsic, AMDIL.td, $@)
 
 AMDISAGenCodeEmitter.inc: *.td
-	$(call tablegen, -gen-emitter, AMDISA.td, $@)
+	$(call tablegen, -gen-emitter, AMDIL.td, $@)
 
 %.td: ;
 
