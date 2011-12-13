@@ -184,6 +184,12 @@ bool R600CodeEmitter::runOnMachineFunction(MachineFunction &MF) {
   } else {
     evergreenEncoding = true;
   }
+  const AMDISATargetMachine *amdtm =
+    static_cast<const AMDISATargetMachine *>(&MF.getTarget());
+
+  if (amdtm->shouldDumpCode()) {
+    MF.dump();
+  }
 
   for (MachineFunction::iterator BB = MF.begin(), BB_E = MF.end();
                                                   BB != BB_E; ++BB) {

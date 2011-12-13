@@ -59,7 +59,8 @@ Target TheAMDISATarget;
  */
 extern "C" unsigned
 radeon_llvm_compile(LLVMModuleRef M, unsigned char ** bytes,
-                 unsigned * byte_count, const char * gpu_family) {
+                 unsigned * byte_count, const char * gpu_family,
+                 unsigned dump) {
 
 #ifdef EXTERNAL_LLVM
    const Target * AMDISATarget = NULL;
@@ -101,6 +102,10 @@ radeon_llvm_compile(LLVMModuleRef M, unsigned char ** bytes,
 #else
    AMDISATargetMachine * tm = new AMDISATargetMachine(TheAMDISATarget, AMDISATriple.getTriple(), FS);
    TargetMachine &AMDISATargetMachine = *tm;
+   /* XXX: Use TargetMachine.Options in 3.0 */
+   if (dump) {
+      tm->dumpCode();
+   }
 #endif
    const TargetData * AMDISAData = AMDISATargetMachine.getTargetData();
    PassManager PM;

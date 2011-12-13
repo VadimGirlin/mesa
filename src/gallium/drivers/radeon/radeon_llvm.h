@@ -34,8 +34,8 @@ extern "C" {
 #endif
 
 unsigned  radeon_llvm_compile(LLVMModuleRef M, unsigned char ** bytes,
-                           unsigned * byte_count, const char * gpu_family);
-
+                           unsigned * byte_count, const char * gpu_family,
+													 unsigned dump);
 void radeon_setup_tgsi_llvm(struct tgsi_llvm_context * ctx);
 
 #ifdef __cplusplus

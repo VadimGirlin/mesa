@@ -41,6 +41,9 @@
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/Support/StandardPasses.h"
+#include "llvm/Support/raw_os_ostream.h"
+
+#include <iostream>
 
 using namespace llvm;
 
@@ -52,7 +55,8 @@ AMDISATargetMachine::AMDISATargetMachine(const Target &T, StringRef TT,
   InstrInfo(new R600InstrInfo(*this)),
   TLInfo(*this),
   mGM(new AMDILGlobalManager(0 /* Debug mode */)),
-  mKM(new AMDILKernelManager(this, mGM))
+  mKM(new AMDILKernelManager(this, mGM)),
+  mDump(false)
 //   DataLayout(""/*Subtarget.getDataLayout()*/),
 //   TLInfo(*this), TSInfo(*this), InstrInfo(Subtarget),
 //   FrameLowering(Subtarget)

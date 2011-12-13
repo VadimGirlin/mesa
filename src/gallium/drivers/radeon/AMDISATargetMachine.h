@@ -57,6 +57,7 @@ class AMDISATargetMachine : public AMDILTargetMachine {
 //   AMDISAFrameLowering FrameLowering;
      AMDILGlobalManager *mGM;
      AMDILKernelManager *mKM;
+     bool mDump;
 
 public:
    AMDISATargetMachine(const Target &T, StringRef TT, StringRef FS);
@@ -88,6 +89,9 @@ public:
                                     CodeGenFileType FileType,
                                     CodeGenOpt::Level OptLevel,
                                     bool DisableVerify);
+public:
+   void dumpCode() { mDump = true; }
+   bool shouldDumpCode() const { return mDump; }
 };
 
 } /* End namespace llvm */

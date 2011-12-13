@@ -1057,10 +1057,11 @@ static int r600_shader_from_tgsi(struct r600_pipe_context * rctx, struct r600_pi
 
 	if (use_llvm) {
 		char * gpu_family;
+		unsigned dump = 0;
 		r600_llvm_ctx.reserved_reg_count = ctx.file_offset[TGSI_FILE_INPUT];
 		mod = tgsi_llvm(&tg_ll_ctx, tokens);
 		if (debug_get_bool_option("R600_DUMP_SHADERS", FALSE)) {
-			tgsi_dump(tokens, 0);
+			dump = 1;
 			LLVMDumpModule(mod);
 		}
 
@@ -1119,7 +1120,7 @@ static int r600_shader_from_tgsi(struct r600_pipe_context * rctx, struct r600_pi
 		}
 
 		if (radeon_llvm_compile(mod, &inst_bytes, &inst_byte_count,
-								gpu_family)) {
+							gpu_family, dump)) {
 			ctx.file_offset[TGSI_FILE_OUTPUT] =
 					ctx.file_offset[TGSI_FILE_INPUT];
 		} else {
