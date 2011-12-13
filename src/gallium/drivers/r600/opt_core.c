@@ -1489,10 +1489,12 @@ static void mark_interferences(struct vset * live)
 	for(q=0; q<live->count; q++) {
 		struct var_desc * v = live->keys[q];
 
-		if (v->interferences)
-			vset_addset(v->interferences, live);
-		else
-			v->interferences = vset_createcopy(live);
+		if (!(v->flags & VF_DEAD)) {
+			if (v->interferences)
+				vset_addset(v->interferences, live);
+			else
+				v->interferences = vset_createcopy(live);
+		}
 	}
 }
 

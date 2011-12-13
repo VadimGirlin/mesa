@@ -43,7 +43,8 @@ static void update_interferences(struct vset * live)
 	for (q=0;q<live->count; q++) {
 		struct var_desc * v = live->keys[q];
 
-		vset_addset(v->interferences, live);
+		if (!(v->flags & VF_DEAD))
+			vset_addset(v->interferences, live);
 	}
 }
 
@@ -250,6 +251,7 @@ static enum node_subtype gs_prio_get_node_subtype(struct ast_node * node)
 static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * node)
 {
 	unsigned pri = 0, max_child_prio = 0;
+	boolean writes_am = false;
 
 	if (node->flags & AF_DEAD)
 		return 0;
@@ -278,10 +280,17 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		int q;
 		for (q=0; q<node->outs->count; q++) {
 			struct var_desc * v = node->outs->keys[q];
-			if (v && !(v->flags & VF_DEAD) && (v->prio > pri))
-				pri = v->prio;
+			if (v && !(v->flags & VF_DEAD)) {
+				if (v->prio > pri)
+					pri = v->prio;
+				if (v->reg.reg == REG_AM)
+					writes_am = true;
+			}
 		}
 	}
+
+	if (node->flow_dep && pri < node->flow_dep->prio)
+		pri = node->flow_dep->prio;
 
 	if (node->type != NT_LIST) {
 		if (node->subtype == NST_TEX_INST || node->subtype == NST_VTX_INST) {
@@ -314,7 +323,7 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		int q;
 		for (q=0; q<node->outs->count; q++) {
 			struct var_desc * v = node->outs->keys[q];
-			if (v && !(v->flags & VF_DEAD) && (v->prio < node->min_prio))
+			if (v && !(v->flags & VF_DEAD) && v->prio < node->min_prio)
 				v->prio = node->min_prio;
 		}
 	}
@@ -350,7 +359,7 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		}
 	}
 
-	if (node->flow_dep) {
+	if (node->flow_dep /*&& writes_am*/) {
 		struct var_desc * v = node->flow_dep;
 		if (v && !(v->flags & VF_DEAD) && (v->prio < node->min_prio))
 			v->prio = node->min_prio;
@@ -1739,7 +1748,8 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 				break;
 		}
 
-		sched_check_interferences(&ctx);
+		if (!sched_check_interferences(&ctx))
+			return false;
 
 		if (ctx.restart)
 			continue;
