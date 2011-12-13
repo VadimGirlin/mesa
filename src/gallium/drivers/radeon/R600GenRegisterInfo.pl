@@ -130,7 +130,8 @@ def HALF : AMDILReg<872, "0.5">;
 def ONE : AMDILReg<873, "1.0">;
 def NEG_HALF : AMDILReg<874, "-0.5">;
 def NEG_ONE : AMDILReg<875, "-1.0">;
+def PV_X : AMDILReg<876, "pv.x">;
 
-def SPECIAL : RegisterClass<"AMDIL", [f32], 32, [ZERO, HALF, ONE, NEG_HALF, NEG_ONE]>; 
+def SPECIAL : RegisterClass<"AMDIL", [f32], 32, [ZERO, HALF, ONE, NEG_HALF, NEG_ONE, PV_X]>; 
 
 STRING

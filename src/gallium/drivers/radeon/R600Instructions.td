@@ -210,8 +210,9 @@ multiclass MOV_Multi {
 
 defm MOV : MOV_Multi;
 
-def KILLGT : InstR600 <0x2D, (outs), (ins GPRF32:$src), "KILLGIT $src",
-  [(int_AMDISA_kill GPRF32:$src)]
+def KILLGT : R600_1OP_Float <
+  0x2D, "KILLGT",
+  [(set GPRF32:$dst, (int_AMDISA_kill GPRF32:$src))]
 >;
 
 def AND_INT : R600_2OP <

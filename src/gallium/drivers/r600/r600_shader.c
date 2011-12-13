@@ -831,9 +831,12 @@ static unsigned r600_alu_from_byte_stream(struct r600_shader_ctx *ctx,
 	alu.omod = bytes[bytes_read++];
 	r600_bytecode_add_alu(ctx->bc, &alu);
 
-	/* XXX: For KILL instructions, set ctx->shader->uses_kill,
- 	 * ctx->bc->force_add_cf */
-
+	/* XXX: Handle other KILL instructions */
+	if (alu.inst == CTX_INST(V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_KILLGT)) {
+		ctx->shader->uses_kill = 1;
+		/* XXX: This should be enforced in the LLVM backend. */
+		ctx->bc->force_add_cf = 1;
+	}
 	return bytes_read;
 }
 

@@ -40,7 +40,7 @@ let TargetPrefix = "AMDISA", isTarget = 1 in {
   def int_AMDISA_div : Intrinsic<[llvm_float_ty], [llvm_float_ty, llvm_float_ty], []>;
   def int_AMDISA_dp4 : Intrinsic<[llvm_float_ty], [llvm_v4f32_ty, llvm_v4f32_ty], []>;
   def int_AMDISA_floor : Intrinsic<[llvm_float_ty], [llvm_float_ty], []>;
-  def int_AMDISA_kill : Intrinsic<[], [llvm_float_ty], []>;
+  def int_AMDISA_kill : Intrinsic<[llvm_float_ty], [llvm_float_ty], []>;
   def int_AMDISA_kilp : Intrinsic<[], [], []>;
   def int_AMDISA_lrp : Intrinsic<[llvm_float_ty], [llvm_float_ty, llvm_float_ty, llvm_float_ty], []>;
   def int_AMDISA_mul : Intrinsic<[llvm_float_ty], [llvm_float_ty, llvm_float_ty], []>;
