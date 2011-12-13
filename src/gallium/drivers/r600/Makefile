@@ -21,6 +21,9 @@ EXTRA_OBJECTS = \
 CLEAN_DEPS = \
 	clean_radeon
 
+DEFAULT_DEPS = \
+	make_radeon
+
 endif
 
 include ../../Makefile.template
@@ -30,6 +33,7 @@ $(LIBRADEON): make_radeon
 .PHONY: make_radeon
 
 make_radeon:
+	touch $(LIBRADEON)
 	$(MAKE) -C $(TOP)/src/gallium/drivers/radeon/ default
 
 clean_radeon:
