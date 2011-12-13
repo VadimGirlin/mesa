@@ -292,9 +292,9 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 /*	if (node->flow_dep && pri < node->flow_dep->prio)
 		pri = node->flow_dep->prio;
 */
-	if (node->type == NT_REGION || node->type == NT_IF || node->type == NT_IF || node->type == NT_DEPART || node->type == NT_REPEAT)
+/*	if (node->type == NT_REGION || node->type == NT_IF || node->type == NT_IF || node->type == NT_DEPART || node->type == NT_REPEAT)
 		pri += ANP_PRIO_BLOCKSTEP;
-
+*/
 	if (node->type != NT_LIST) {
 		if (node->subtype == NST_TEX_INST || node->subtype == NST_VTX_INST) {
 			unsigned lvl;
@@ -339,6 +339,18 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 				v->prio = pri;
 		}
 	}
+
+	if ((node->type == NT_DEPART || node->type == NT_REPEAT) && node->vars_live) {
+		int q;
+		for (q=0; q<node->vars_live->count; q++) {
+			struct var_desc * v = node->vars_live->keys[q];
+
+			if (v && !(v->flags & VF_DEAD) && (v->prio < pri))
+				v->prio = pri;
+		}
+	}
+
+
 
 	if (node->loop_phi) {
 		gs_calc_min_prio(info, node->loop_phi);

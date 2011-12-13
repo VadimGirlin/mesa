@@ -2133,12 +2133,12 @@ static void fix_loop_ops(struct shader_info * info, struct ast_node * node)
 		assert(p);
 		node->new_cf->cf_addr = p->new_cf->id;
 
-	} else {
-		if (node->child)
-			fix_loop_ops(info, node->child);
-		if (node->rest)
-			fix_loop_ops(info, node->rest);
 	}
+
+	if (node->child)
+		fix_loop_ops(info, node->child);
+	if (node->rest)
+		fix_loop_ops(info, node->rest);
 }
 
 static void destroy_constraint(struct rc_constraint * c, boolean bs)
