@@ -503,6 +503,7 @@ static struct ast_node * parse_cf(struct shader_info * info, struct ast_node * c
 				cfn->cf->output.inst = EG_V_SQ_CF_ALLOC_EXPORT_WORD1_SQ_CF_INST_EXPORT;
 
 				cfn = ln->child;
+				cfn->subtype = NST_CF_INST;
 
 				cfn->cf->output.gpr++;
 				cfn->cf->output.array_base++;
