@@ -25,25 +25,19 @@
  */
 
 
+#include "AMDILSubtarget.h"
 #include "AMDILUtilityFunctions.h"
 #include "AMDISAISelLowering.h"
 
 using namespace llvm;
 
 AMDISATargetLowering::AMDISATargetLowering(TargetMachine &TM) :
-  AMDILTargetLowering(TM) { }
-
-MachineBasicBlock *
-AMDISATargetLowering::EmitInstrWithCustomInserter(
-    MachineInstr *MI,
-    MachineBasicBlock *MBB) const
+  AMDILTargetLowering(TM)
 {
-/*  switch (MI->getOpcode()) {
-    ExpandCaseToAllTypes(AMDIL::CMP);
-      return MBB;
+  const AMDILSubtarget &STM = TM.getSubtarget<AMDILSubtarget>();
+
+  /* XXX: Not supported yet on R600 */
+  if (STM.device()->getGeneration() > AMDILDeviceInfo::HD6XXX) {
+    setOperationAction(ISD::EXTRACT_VECTOR_ELT, MVT::v4f32, Legal);
   }
-*/
-  return AMDILTargetLowering::EmitInstrWithCustomInserter(MI, MBB);
 }
-
-
