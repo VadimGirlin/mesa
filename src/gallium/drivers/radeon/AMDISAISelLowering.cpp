@@ -31,8 +31,19 @@
 using namespace llvm;
 
 AMDISATargetLowering::AMDISATargetLowering(TargetMachine &TM) :
-  AMDILTargetLowering(TM)
+  AMDILTargetLowering(TM) { }
+
+MachineBasicBlock *
+AMDISATargetLowering::EmitInstrWithCustomInserter(
+    MachineInstr *MI,
+    MachineBasicBlock *MBB) const
 {
-  setOperationAction(ISD::EXTRACT_VECTOR_ELT, MVT::v4f32, Legal);
+/*  switch (MI->getOpcode()) {
+    ExpandCaseToAllTypes(AMDIL::CMP);
+      return MBB;
+  }
+*/
+  return AMDILTargetLowering::EmitInstrWithCustomInserter(MI, MBB);
 }
+
 

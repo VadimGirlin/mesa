@@ -37,6 +37,9 @@ namespace llvm {
     public:
       AMDISATargetLowering(TargetMachine &TM);
 
+      virtual MachineBasicBlock* EmitInstrWithCustomInserter(
+            MachineInstr *MI,
+            MachineBasicBlock *MBB) const;
   };
 
 } /* End namespace llvm */
