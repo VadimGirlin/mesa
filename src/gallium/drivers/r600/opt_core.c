@@ -2596,7 +2596,7 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 		d->abs = nabs;
 
 		if (sv) {
-			if (m->flags & AF_ALU_CLAMP_DST)
+			if ((m->flags & AF_ALU_CLAMP_DST) || (node->flags & AF_FOUR_SLOTS_INST))
 				return false;
 
 			node->ins->keys[index] = sv;
