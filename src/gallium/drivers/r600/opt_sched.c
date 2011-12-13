@@ -83,7 +83,7 @@ static struct ast_node * gs_create_list(struct shader_info * info, struct vque *
 	int q;
 	struct ast_node * list = NULL, * clause = NULL, * lc;
 	boolean last_alu = false;
-	unsigned /*last_alu_prio=0,*/ nalu = 0;
+	unsigned last_alu_prio=0, nalu = 0;
 
 	for (q=0; q<blocks->count; q++) {
 		struct ast_node * n = blocks->keys[q*2+1];
@@ -94,7 +94,7 @@ static struct ast_node * gs_create_list(struct shader_info * info, struct vque *
 
 		if (alu) {
 			if (n->subtype == NST_ALU_INST || n->subtype == NST_COPY) {
-				boolean new_group = /*(n->min_prio!=last_alu_prio) ||*/ (nalu==info->max_slots-1);
+				boolean new_group = (n->min_prio!=last_alu_prio) || (nalu==info->max_slots-1);
 
 				if (new_group) {
 					n->alu->last = 1;
@@ -102,11 +102,11 @@ static struct ast_node * gs_create_list(struct shader_info * info, struct vque *
 				} else
 					n->alu->last = 0;
 
-				/* last_alu_prio = n->min_prio; */
+				 last_alu_prio = n->min_prio;
 				nalu++;
 
-			} /*else
-				last_alu_prio = 0; */
+			} else
+				last_alu_prio = 0;
 
 			if (!last_alu) {
 
@@ -276,6 +276,9 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		max_child_prio = MAX2(max_child_prio, mcp);
 	}
 
+
+	pri = max_child_prio;
+
 	if (node->outs) {
 		int q;
 		for (q=0; q<node->outs->count; q++) {
@@ -289,12 +292,6 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		}
 	}
 
-/*	if (node->flow_dep && pri < node->flow_dep->prio)
-		pri = node->flow_dep->prio;
-*/
-/*	if (node->type == NT_REGION || node->type == NT_IF || node->type == NT_IF || node->type == NT_DEPART || node->type == NT_REPEAT)
-		pri += ANP_PRIO_BLOCKSTEP;
-*/
 	if (node->type != NT_LIST) {
 		if (node->subtype == NST_TEX_INST || node->subtype == NST_VTX_INST) {
 			unsigned lvl;
