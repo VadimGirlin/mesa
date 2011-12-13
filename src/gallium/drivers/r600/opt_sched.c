@@ -289,8 +289,11 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		}
 	}
 
-	if (node->flow_dep && pri < node->flow_dep->prio)
+/*	if (node->flow_dep && pri < node->flow_dep->prio)
 		pri = node->flow_dep->prio;
+*/
+	if (node->type == NT_REGION || node->type == NT_IF || node->type == NT_IF || node->type == NT_DEPART || node->type == NT_REPEAT)
+		pri += ANP_PRIO_BLOCKSTEP;
 
 	if (node->type != NT_LIST) {
 		if (node->subtype == NST_TEX_INST || node->subtype == NST_VTX_INST) {
@@ -359,9 +362,9 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		}
 	}
 
-	if (node->flow_dep /*&& writes_am*/) {
+	if (node->flow_dep) {
 		struct var_desc * v = node->flow_dep;
-		if (v && !(v->flags & VF_DEAD) && (v->prio < node->min_prio))
+		if (v->prio < node->min_prio)
 			v->prio = node->min_prio;
 	}
 
