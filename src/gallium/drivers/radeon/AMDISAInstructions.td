@@ -27,16 +27,18 @@
 include "AMDISAInstrEnums.td"
 
 class AMDISAInst <dag outs, dag ins, string asm, list<dag> pattern> : Instruction {
-  field bits<29> AMDILOp = 0;
+  field bits<16> AMDILOp = 0;
   field bits<3> Gen = 0;
+  field bit PreloadReg = 0;
 
   let Namespace = "AMDIL";
   let OutOperandList = outs;
   let InOperandList = ins;
   let AsmString = asm;
   let Pattern = pattern;
-  let TSFlags{34-32} = Gen;
-  let TSFlags{63-35} = AMDILOp;
+  let TSFlags{32} = PreloadReg;
+  let TSFlags{42-40} = Gen;
+  let TSFlags{63-48} = AMDILOp;
 }
 
 class AMDISAShaderInst <dag outs, dag ins, string asm, list<dag> pattern>
@@ -59,15 +61,17 @@ let isCodeGenOnly = 1 in {
     (outs GPRF32:$dst),
     (ins i32imm:$src),
     "LOAD_INPUT $dst, $src",
-    []
-  >;
+    [] >{
+    let PreloadReg = 1;
+  }
 
   def RESERVE_REG : AMDISAShaderInst <
     (outs GPRF32:$dst),
     (ins i32imm:$src),
     "RESERVE_REG $dst, $src",
-    [(set GPRF32:$dst, (int_AMDISA_reserve_reg imm:$src))]
-  >;
+    [(set GPRF32:$dst, (int_AMDISA_reserve_reg imm:$src))]> {
+    let PreloadReg = 1;
+  }
 
   def STORE_OUTPUT: AMDISAShaderInst <
     (outs GPRF32:$dst),

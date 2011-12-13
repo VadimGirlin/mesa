@@ -66,7 +66,7 @@ while (<AMDIL>) {
 
 if ($FILE_TYPE eq 'td') {
 
-  print_td_enum('AMDILInst', 'AMDILInstEnums', 'field bits<29>', @INST_ENUMS);
+  print_td_enum('AMDILInst', 'AMDILInstEnums', 'field bits<16>', @INST_ENUMS);
 
   print_td_enum('AMDISAGen', 'AMDISAGenEnums', 'field bits<3>', @GENERATION_ENUM);
 

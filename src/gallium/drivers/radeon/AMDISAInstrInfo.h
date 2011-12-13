@@ -57,9 +57,19 @@ namespace llvm {
   MachineInstr * convertToISA(MachineInstr & MI, MachineFunction &MF,
     DebugLoc DL) const;
 
+  bool isRegPreload(const MachineInstr &MI) const;
+
   #include "AMDISAInstrEnums.h.inc"
   };
 
 } // End llvm namespace
+
+/* AMDISA target flags are stored in bits 32-39 */
+namespace AMDISA_TFLAG_SHIFTS {
+  enum TFLAGS {
+    PRELOAD_REG = 32
+  };
+}
+
 
 #endif // AMDISAINSTRINFO_H_

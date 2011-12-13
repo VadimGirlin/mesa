@@ -41,8 +41,8 @@ AMDISAInstrInfo::AMDISAInstrInfo(AMDISATargetMachine &tm)
                    TM.getSubtarget<AMDILSubtarget>().device()->getGeneration();
   for (unsigned i = 0; i < AMDIL::INSTRUCTION_LIST_END; i++) {
     const TargetInstrDesc & instDesc = get(i);
-    uint32_t instGen = (instDesc.TSFlags >> 32) & 0x7;
-    uint32_t inst = (instDesc.TSFlags >>  35) & 0x1fffffff;
+    uint32_t instGen = (instDesc.TSFlags >> 40) & 0x7;
+    uint32_t inst = (instDesc.TSFlags >>  48) & 0xffff;
     if (inst == 0) {
       continue;
     }
@@ -116,6 +116,11 @@ unsigned AMDISAInstrInfo::getISAOpcode(unsigned opcode) const
   } else {
     return amdilToISA.find(opcode)->second;
   }
+}
+
+bool AMDISAInstrInfo::isRegPreload(const MachineInstr &MI) const
+{
+  return (get(MI.getOpcode()).TSFlags >> AMDISA_TFLAG_SHIFTS::PRELOAD_REG) & 0x1;
 }
 
 #include "AMDISAInstrEnums.inc"

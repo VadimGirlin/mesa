@@ -41,7 +41,7 @@ class InstR600 <bits<32> inst, dag outs, dag ins, string asm, list<dag> pattern>
   let AsmString = asm;
   let Pattern = pattern;
 
-	let TSFlags{4} = Trig;
+  let TSFlags{4} = Trig;
   let TSFlags{5} = Op3;
 }
 

@@ -65,13 +65,14 @@ CPP_SOURCES := \
 	AMDISAFixRegClasses.cpp		\
 	AMDISAISelLowering.cpp		\
 	AMDISAConvertToISA.cpp		\
-	AMDISALowerShaderInstructions.cpp	\
+	AMDISAReorderPreloadInstructions.cpp	\
 	AMDISAInstrInfo.cpp		\
 	AMDISARegisterInfo.cpp		\
 	AMDISAUtil.cpp			\
 	R600CodeEmitter.cpp		\
 	R600InstrInfo.cpp		\
 	R600LowerInstructions.cpp	\
+	R600LowerShaderInstructions.cpp	\
 	R600RegisterInfo.cpp		\
 	radeon_llvm_emit.cpp
 

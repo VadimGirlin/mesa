@@ -38,7 +38,7 @@
 using namespace llvm;
 
 namespace {
-  class AMDISALowerShaderInstructionsPass : public MachineFunctionPass {
+  class R600LowerShaderInstructionsPass : public MachineFunctionPass {
 
   private:
     static char ID;
@@ -53,19 +53,19 @@ namespace {
     void lowerSWIZZLE(MachineInstr &MI);
 
   public:
-    AMDISALowerShaderInstructionsPass(TargetMachine &tm) :
+    R600LowerShaderInstructionsPass(TargetMachine &tm) :
       MachineFunctionPass(ID), TM(tm) { }
 
       bool runOnMachineFunction(MachineFunction &MF);
 
-      const char *getPassName() const { return "AMDISA Lower Shader Instructions"; }
+      const char *getPassName() const { return "R600 Lower Shader Instructions"; }
     };
 } /* End anonymous namespace */
 
-char AMDISALowerShaderInstructionsPass::ID = 0;
+char R600LowerShaderInstructionsPass::ID = 0;
 
-FunctionPass *llvm::createAMDISALowerShaderInstructionsPass(TargetMachine &tm) {
-    return new AMDISALowerShaderInstructionsPass(tm);
+FunctionPass *llvm::createR600LowerShaderInstructionsPass(TargetMachine &tm) {
+    return new R600LowerShaderInstructionsPass(tm);
 }
 
 #define INSTR_CASE_FLOAT_V(inst) \
@@ -77,13 +77,13 @@ FunctionPass *llvm::createAMDISALowerShaderInstructionsPass(TargetMachine &tm) {
 #define INSTR_CASE_FLOAT(inst) \
   INSTR_CASE_FLOAT_V(inst) \
   INSTR_CASE_FLOAT_S(inst)
-bool AMDISALowerShaderInstructionsPass::runOnMachineFunction(MachineFunction &MF)
+bool R600LowerShaderInstructionsPass::runOnMachineFunction(MachineFunction &MF)
 {
   MRI = &MF.getRegInfo();
   std::vector<MachineInstr *> storeOutputInstrs;
   std::vector<MachineInstr *> exportRegInstrs;
 
-   /* Move EXPORT_REG, STORE_OUTPUT to the end; Move RESERVE_REG and LOAD_INPUT to the front*/
+  /* Move EXPORT_REG, STORE_OUTPUT to the end; Move RESERVE_REG and LOAD_INPUT to the front*/
   for (MachineFunction::iterator BB = MF.begin(), BB_E = MF.end();
                                                   BB != BB_E; ++BB) {
     MachineBasicBlock &MBB = *BB;
@@ -97,10 +97,6 @@ bool AMDISALowerShaderInstructionsPass::runOnMachineFunction(MachineFunction &MF
         break;
       case AMDIL::STORE_OUTPUT:
         storeOutputInstrs.push_back(MI.removeFromParent());
-        break;
-      case AMDIL::RESERVE_REG:
-      case AMDIL::LOAD_INPUT:
-        MBB.insert(MBB.begin(), MI.removeFromParent());
         break;
       case AMDIL::RETURN:
         for (std::vector<MachineInstr*>::iterator SO = storeOutputInstrs.begin(),
@@ -160,7 +156,7 @@ bool AMDISALowerShaderInstructionsPass::runOnMachineFunction(MachineFunction &MF
  * XXX: I don't think this is the right way things assign physical registers,
  * but I'm not sure of another way to do this.
  */
-void AMDISALowerShaderInstructionsPass::lowerLOAD_INPUT(MachineInstr &MI)
+void R600LowerShaderInstructionsPass::lowerLOAD_INPUT(MachineInstr &MI)
 {
   MachineOperand &dst = MI.getOperand(0);
   MachineOperand &arg = MI.getOperand(1);
@@ -170,7 +166,7 @@ void AMDISALowerShaderInstructionsPass::lowerLOAD_INPUT(MachineInstr &MI)
   MRI->replaceRegWith(dst.getReg(), newRegister);
 }
 
-bool AMDISALowerShaderInstructionsPass::lowerSTORE_OUTPUT(MachineInstr &MI,
+bool R600LowerShaderInstructionsPass::lowerSTORE_OUTPUT(MachineInstr &MI,
     MachineBasicBlock &MBB, MachineBasicBlock::iterator I)
 {
   MachineOperand &dstOp = MI.getOperand(0);
@@ -191,7 +187,7 @@ bool AMDISALowerShaderInstructionsPass::lowerSTORE_OUTPUT(MachineInstr &MI,
 
 }
 
-void AMDISALowerShaderInstructionsPass::lowerSWIZZLE(MachineInstr &MI)
+void R600LowerShaderInstructionsPass::lowerSWIZZLE(MachineInstr &MI)
 {
   MachineOperand &dstOp = MI.getOperand(0);
   MachineOperand &valOp = MI.getOperand(1);

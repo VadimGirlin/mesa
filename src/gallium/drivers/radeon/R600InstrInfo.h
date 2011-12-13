@@ -76,7 +76,7 @@ namespace R600_InstFlag {
 		REDUCTION = (1 << 2),
 		FC = (1 << 3),
 		TRIG = (1 << 4),
-    OP3 = (1 << 5)
+		OP3 = (1 << 5)
 	};
 }
 

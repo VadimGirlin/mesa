@@ -38,7 +38,10 @@ namespace llvm {
     class AMDISATargetMachine;
 
     FunctionPass *createR600CodeEmitterPass(formatted_raw_ostream &OS);
+    FunctionPass *createR600LowerShaderInstructionsPass(TargetMachine &tm);
     FunctionPass *createR600LowerInstructionsPass(TargetMachine &tm);
+
+    FunctionPass *createAMDISAReorderPreloadInstructionsPass(TargetMachine &tm);
 
     FunctionPass *createAMDISALowerShaderInstructionsPass(TargetMachine &tm);
 
