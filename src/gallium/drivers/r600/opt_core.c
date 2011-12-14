@@ -2593,9 +2593,6 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 		if (nabs && node->alu->is_op3)
 			return false;
 
-		d->neg = nneg;
-		d->abs = nabs;
-
 		if (sv) {
 			if ((m->flags & AF_ALU_CLAMP_DST) || (node->flags & AF_FOUR_SLOTS_INST))
 				return false;
@@ -2645,6 +2642,9 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 			node->ins->keys[index] = NULL;
 			node->const_ins_count++;
 		}
+
+                d->neg = nneg;
+                d->abs = nabs;
 
 		if (node->flags & AF_FOUR_SLOTS_INST) {
 			struct ast_node * p = node->parent;
