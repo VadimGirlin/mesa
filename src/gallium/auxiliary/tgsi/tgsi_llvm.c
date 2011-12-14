@@ -943,6 +943,27 @@ static void emit_instructions(struct tgsi_llvm_context * ctx)
 }
 
 static LLVMValueRef
+emit_array_index(
+   struct lp_build_tgsi_soa_context *bld,
+   const struct tgsi_full_src_register *reg,
+   const unsigned swizzle)
+{
+   LLVMBuilderRef builder = bld->base.gallivm->builder;
+
+   LLVMValueRef addr = LLVMBuildLoad(builder,
+                             bld->addr[reg->Indirect.Index][swizzle], "");
+   LLVMValueRef offset = lp_build_const_int32(bld->base.gallivm,
+                                              reg->Register.Index);
+   LLVMValueRef hw_index = LLVMBuildAdd(builder, addr, offset, "");
+   LLVMValueRef soa_index = LLVMBuildMul(builder, hw_index,
+                          lp_build_const_int32(bld->base.gallivm, 4), "");
+   LLVMValueRef array_index = LLVMBuildAdd(builder, soa_index,
+                    lp_build_const_int32(bld->base.gallivm, swizzle), "");
+
+   return array_index;
+}
+
+static LLVMValueRef
 emit_fetch_switch_file_soa(
    struct lp_build_tgsi_soa_context *bld,
    const struct tgsi_full_src_register *reg,
@@ -966,17 +987,22 @@ emit_fetch_switch_file_soa(
    case TGSI_FILE_INPUT:
       return ctx->inputs[tgsi_llvm_reg_index_soa(reg->Register.Index, swizzle)];
 
+   case TGSI_FILE_OUTPUT:
+      if (reg->Register.Indirect) {
+         LLVMValueRef array_index = emit_array_index(bld, reg, swizzle);
+         LLVMValueRef ptr = LLVMBuildGEP(builder, bld->outputs_array, &array_index,
+                                         1, "");
+         return LLVMBuildLoad(builder, ptr, "");
+      } else {
+         LLVMValueRef temp_ptr;
+         temp_ptr = lp_get_output_ptr(bld, reg->Register.Index, swizzle);
+         res = LLVMBuildLoad(builder, temp_ptr, "");
+         return res;
+      }
+
    case TGSI_FILE_TEMPORARY:
       if (reg->Register.Indirect) {
-         LLVMValueRef addr = LLVMBuildLoad(builder,
-                                   bld->addr[reg->Indirect.Index][swizzle], "");
-         LLVMValueRef offset = lp_build_const_int32(bld->base.gallivm,
-                                                    reg->Register.Index);
-         LLVMValueRef hw_index = LLVMBuildAdd(builder, addr, offset, "");
-         LLVMValueRef soa_index = LLVMBuildMul(builder, hw_index,
-                                lp_build_const_int32(bld->base.gallivm, 4), "");
-         LLVMValueRef array_index = LLVMBuildAdd(builder, soa_index,
-                          lp_build_const_int32(bld->base.gallivm, swizzle), "");
+         LLVMValueRef array_index = emit_array_index(bld, reg, swizzle);
          LLVMValueRef ptr = LLVMBuildGEP(builder, bld->temps_array, &array_index,
 					 1, "");
          return LLVMBuildLoad(builder, ptr, "");
