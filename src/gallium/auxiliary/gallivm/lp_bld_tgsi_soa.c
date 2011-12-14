@@ -368,8 +368,8 @@ lp_get_temp_ptr_soa(struct lp_build_tgsi_soa_context *bld,
  * \param index  which output register
  * \param chan  which channel of the output register.
  */
-static LLVMValueRef
-get_output_ptr(struct lp_build_tgsi_soa_context *bld,
+LLVMValueRef
+lp_get_output_ptr(struct lp_build_tgsi_soa_context *bld,
                unsigned index,
                unsigned chan)
 {
@@ -878,7 +878,7 @@ lp_emit_store_soa(
                            &bld->exec_mask, pred);
       }
       else {
-         LLVMValueRef out_ptr = get_output_ptr(bld, reg->Register.Index,
+         LLVMValueRef out_ptr = lp_get_output_ptr(bld, reg->Register.Index,
                                                chan_index);
          lp_exec_mask_store(&bld->exec_mask, pred, value, out_ptr);
       }
@@ -2387,7 +2387,7 @@ lp_build_tgsi_soa(struct gallivm_state *gallivm,
       assert(info->num_outputs <= info->file_max[TGSI_FILE_OUTPUT] + 1);
       for (index = 0; index < info->num_outputs; ++index) {
          for (chan = 0; chan < NUM_CHANNELS; ++chan) {
-            bld.outputs[index][chan] = get_output_ptr(&bld, index, chan);
+            bld.outputs[index][chan] = lp_get_output_ptr(&bld, index, chan);
          }
       }
    }

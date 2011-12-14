@@ -380,6 +380,11 @@ lp_get_temp_ptr_soa(
    unsigned index,
    unsigned chan);
 
+LLVMValueRef
+lp_get_output_ptr(
+   struct lp_build_tgsi_soa_context *bld,
+   unsigned index,
+   unsigned chan);
 
 struct lp_build_tgsi_aos_context
 {
