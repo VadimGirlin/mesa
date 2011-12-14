@@ -368,7 +368,8 @@ void R600CodeEmitter::emitDst(const MachineOperand & MO)
     }
 
     /* Emit writemask (1 byte).  */
-    if (isReduction && reductionElement != getRegElement(TRI, MO.getReg())) {
+    if ((isReduction && reductionElement != getRegElement(TRI, MO.getReg()))
+         || MO.getTargetFlags() & MO_FLAG_MASK) {
       emitByte(0);
     } else {
       emitByte(1);

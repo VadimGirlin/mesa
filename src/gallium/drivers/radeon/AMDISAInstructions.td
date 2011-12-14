@@ -65,6 +65,13 @@ let isCodeGenOnly = 1 in {
     let PreloadReg = 1;
   }
 
+  def MASK_WRITE : AMDISAShaderInst <
+    (outs),
+    (ins GPRF32:$src),
+    "MASK_WRITE $src",
+    []
+  >;
+
   def RESERVE_REG : AMDISAShaderInst <
     (outs GPRF32:$dst),
     (ins i32imm:$src),

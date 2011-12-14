@@ -199,6 +199,16 @@ bool R600LowerInstructionsPass::runOnMachineFunction(MachineFunction &MF)
         break;
         }
 
+      case AMDIL::MASK_WRITE:
+      {
+        unsigned maskedRegister = MI.getOperand(0).getReg();
+        assert(TargetRegisterInfo::isVirtualRegister(maskedRegister));
+        MachineInstr * defInstr = MRI.getVRegDef(maskedRegister);
+        MachineOperand * def = defInstr->findRegisterDefOperand(maskedRegister);
+        def->addTargetFlag(MO_FLAG_MASK);
+        break;
+      }
+
       case AMDIL::VEXTRACT_v4f32:
         MI.getOperand(2).setImm(MI.getOperand(2).getImm() - 1);
         continue;

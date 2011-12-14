@@ -267,7 +267,7 @@ def TEX_SAMPLE_C_G : R600_TEX <
 
 def KILP : Pat <
   (int_AMDISA_kilp),
-  (KILLGT ONE, ZERO)
+  (MASK_WRITE (KILLGT ONE, ZERO))
 >;
 
 /* Helper classes for common instructions */
