@@ -472,6 +472,7 @@ static struct ast_node * parse_cf(struct shader_info * info, struct ast_node * c
 
 
 		cfn->cf->output.burst_count = 1;
+		cfn->flow_dep = get_var(info, REG_AM, 0, 0);
 
 		for (w = 0; w<count; w++) {
 
@@ -537,6 +538,8 @@ static boolean parse_shader(struct shader_info * info, struct ast_node * root)
 
 		cfn->cf = cf;
 		cfn->label = cf->id;
+
+		cfn->flow_dep = get_var(info, REG_AM, 0, 0);
 
 		cfn = parse_cf(info, cfn);
 		node = cfn->parent;
