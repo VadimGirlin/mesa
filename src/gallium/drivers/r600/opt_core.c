@@ -2032,7 +2032,7 @@ static void set_regs(struct shader_info * info, struct ast_node * node)
 
 				node->tex->src_sel[q] = ssel;
 			}
-			node->tex->src_gpr = gpr;
+			node->tex->src_gpr = gpr >= 0 ? gpr : 0;
 		}
 
 		if (node->outs) {
@@ -2061,7 +2061,7 @@ static void set_regs(struct shader_info * info, struct ast_node * node)
 				}
 			}
 
-			node->tex->dst_gpr = gpr>=0 ? gpr : 0;
+			node->tex->dst_gpr = gpr >= 0 ? gpr : 0;
 		}
 	} else if (node->vtx) {
 		if (node->ins) {
@@ -2121,7 +2121,7 @@ static void set_regs(struct shader_info * info, struct ast_node * node)
 				}
 			}
 
-			node->vtx->dst_gpr = gpr;
+			node->vtx->dst_gpr = gpr >= 0 ? gpr : 0;
 		}
 	}
 }
