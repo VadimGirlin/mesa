@@ -162,20 +162,7 @@ bool r600_init_resource(struct r600_screen *rscreen,
 		initial_domain = RADEON_DOMAIN_GTT;
 	} else {
 		domains = RADEON_DOMAIN_GTT | RADEON_DOMAIN_VRAM;
-
-		switch(usage) {
-		case PIPE_USAGE_DYNAMIC:
-		case PIPE_USAGE_STREAM:
-		case PIPE_USAGE_STAGING:
-			initial_domain = RADEON_DOMAIN_GTT;
-			break;
-		case PIPE_USAGE_DEFAULT:
-		case PIPE_USAGE_STATIC:
-		case PIPE_USAGE_IMMUTABLE:
-		default:
-			initial_domain = RADEON_DOMAIN_VRAM;
-			break;
-		}
+		initial_domain = RADEON_DOMAIN_VRAM;
 	}
 
 	res->buf = rscreen->ws->buffer_create(rscreen->ws, size, alignment, bind, initial_domain);
