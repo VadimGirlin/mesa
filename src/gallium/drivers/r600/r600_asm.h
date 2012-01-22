@@ -222,6 +222,9 @@ int r600_bytecode_add_cfinst(struct r600_bytecode *bc, int inst);
 int r600_bytecode_add_alu_type(struct r600_bytecode *bc, const struct r600_bytecode_alu *alu, int type);
 void r600_bytecode_special_constants(uint32_t value, unsigned *sel, unsigned *neg);
 void r600_bytecode_dump(struct r600_bytecode *bc);
+int r600_bytecode_alloc_kcache_line(struct r600_bytecode *bc,
+		struct r600_bytecode_kcache *kcache,
+		unsigned bank, unsigned line);
 
 int cm_bytecode_add_cf_end(struct r600_bytecode *bc);
 
@@ -230,5 +233,12 @@ int r600_vertex_elements_build_fetch_shader(struct r600_context *rctx, struct r6
 /* r700_asm.c */
 void r700_bytecode_cf_vtx_build(uint32_t *bytecode, const struct r600_bytecode_cf *cf);
 int r700_bytecode_alu_build(struct r600_bytecode *bc, struct r600_bytecode_alu *alu, unsigned id);
+
+int is_alu_reduction_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu);
+int is_alu_trans_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu);
+int is_alu_vec_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu);
+int r600_bytecode_alu_nliterals(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
+				 uint32_t literal[4], unsigned *nliteral);
+unsigned int r600_bytecode_get_num_operands(struct r600_bytecode *bc, struct r600_bytecode_alu *alu);
 
 #endif

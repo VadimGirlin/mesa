@@ -33,7 +33,7 @@
 #define NUM_OF_CYCLES 3
 #define NUM_OF_COMPONENTS 4
 
-static inline unsigned int r600_bytecode_get_num_operands(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
+unsigned int r600_bytecode_get_num_operands(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
 	if(alu->is_op3)
 		return 3;
@@ -411,7 +411,7 @@ static int is_alu_once_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *
 	}
 }
 
-static int is_alu_reduction_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
+int is_alu_reduction_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
 	switch (bc->chip_class) {
 	case R600:
@@ -481,7 +481,7 @@ static int is_opcode_in_range(unsigned opcode, unsigned min, unsigned max)
  *   op3: [0x04 - 0x11]
  *   op2: [0xA0 - 0xE2]
  */
-static int is_alu_vec_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
+int is_alu_vec_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
 	switch (bc->chip_class) {
 	case R600:
@@ -536,7 +536,7 @@ static int is_alu_vec_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_a
  *   op3: 0x1F
  *   op2: [0x81 - 0x9C]
  */
-static int is_alu_trans_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
+int is_alu_trans_unit_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
 
 	switch (bc->chip_class) {
@@ -971,7 +971,7 @@ void r600_bytecode_special_constants(uint32_t value, unsigned *sel, unsigned *ne
 }
 
 /* compute how many literal are needed */
-static int r600_bytecode_alu_nliterals(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
+int r600_bytecode_alu_nliterals(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
 				 uint32_t literal[4], unsigned *nliteral)
 {
 	unsigned num_src = r600_bytecode_get_num_operands(bc, alu);
@@ -1171,7 +1171,7 @@ static int merge_inst_groups(struct r600_bytecode *bc, struct r600_bytecode_alu 
 }
 
 /* we'll keep kcache sets sorted by bank & addr */
-static int r600_bytecode_alloc_kcache_line(struct r600_bytecode *bc,
+int r600_bytecode_alloc_kcache_line(struct r600_bytecode *bc,
 		struct r600_bytecode_kcache *kcache,
 		unsigned bank, unsigned line)
 {
