@@ -73,7 +73,7 @@ static int is_alu_replicate_inst(struct r600_bytecode *bc, struct r600_bytecode_
 static int is_alu_four_slots_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
 	return is_alu_reduction_inst(bc, alu) ||
-			(bc->chip_class >= EVERGREEN &&
+			(bc->chip_class >= EVERGREEN && !alu->is_op3 &&
 					(alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_INTERP_XY ||
 					alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_INTERP_ZW));
 }
@@ -2732,6 +2732,7 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 				return false;
 
 			node->ins->keys[index] = sv;
+			add_use(sv, node);
 		} else {
 
 			d->value = src->value;
@@ -2797,12 +2798,15 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 		struct r600_bytecode_alu_src * src = &m->alu->src[0];
 
 		if (src->sel >= 248 && src->sel<=253) {
-			float val = get_const_val(src);
+			union fui val, zero, one;
+			val.f = get_const_val(src);
+			zero.f = 0.0f;
+			one.f = 1.0f;
 
-			if (val == 0.0f) {
+			if (val.u == zero.u) {
 				node->ins->keys[index] = NULL;
 				*get_output_swizzle_ptr(&node->cf->output, index) = 4;
-			} else if (val == 1.0f) {
+			} else if (val.u == one.u) {
 				node->ins->keys[index] = NULL;
 				*get_output_swizzle_ptr(&node->cf->output, index) = 5;
 			}
@@ -2814,9 +2818,12 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 		struct r600_bytecode_alu_src * src = &m->alu->src[0];
 
 		if (src->sel >= 248 && src->sel<=253) {
-			float val = get_const_val(src);
+			union fui val, zero, one;
+			val.f = get_const_val(src);
+			zero.f = 0.0f;
+			one.f = 1.0f;
 
-			if (val == 0.0f) {
+			if (val.u == zero.u) {
 				node->ins->keys[index] = NULL;
 
 				switch(index) {
@@ -2825,7 +2832,7 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 				case 2: node->tex->src_sel_z = 4; break;
 				case 3: node->tex->src_sel_w = 4; break;
 				}
-			} else if (val == 1.0f) {
+			} else if (val.u == one.u) {
 				node->ins->keys[index] = NULL;
 				switch(index) {
 				case 0: node->tex->src_sel_x = 5; break;

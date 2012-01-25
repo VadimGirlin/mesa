@@ -33,6 +33,13 @@
 #include "opt_dump.h"
 #include "opt_color.h"
 
+union fui
+{
+	float f;
+	unsigned u;
+	int i;
+};
+
 
 /* ast node flags */
 enum ast_flags
