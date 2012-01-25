@@ -844,6 +844,13 @@ static boolean sched_cbs_add_slot(struct scheduler_ctx * ctx, int curgroup, int 
 		}
 	}
 
+	/* reinit data for slots wirh forced swizzle */
+	sched_cbs_reset(ctx, CBS_RES_GPR);
+	for (q=0; q<max_slots; q++)
+		if (ctx->cbs.bs_slots[q] && ctx->cbs.bs_slots[q]->alu->bank_swizzle_force &&
+				!sched_cbs_try_slot(ctx, ctx->cbs.bs_slots[q], bss[q], q==4, CBS_RES_GPR))
+			assert(0);
+
 	/* if all slots have forced bs - ok, nothing to do */
 	if (cs_first_modifiable==-1) {
 		return true;
