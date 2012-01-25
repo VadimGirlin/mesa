@@ -2793,7 +2793,7 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 		}
 
 		return true;
-	} else if (node->subtype == NST_CF_INST && node->cf->output.burst_count==1) {
+	} else if (node->op_class == NOC_CF_EXPORT && node->cf->output.burst_count==1) {
 		struct r600_bytecode_alu_src * src = &m->alu->src[0];
 
 		if (src->sel >= 248 && src->sel<=253) {
