@@ -1071,6 +1071,9 @@ static int merge_inst_groups(struct r600_bytecode *bc, struct r600_bytecode_alu 
 
 		if (num_once_inst > 0)
 		   return 0;
+		   
+		if (slots[i] && slots[i]->bank_swizzle_force)
+			return 0;
 
 		/* check number of literals */
 		if (prev[i]) {
