@@ -1038,6 +1038,9 @@ static int merge_inst_groups(struct r600_bytecode *bc, struct r600_bytecode_alu 
 	for (i = 0; i < max_slots; ++i) {
 		struct r600_bytecode_alu *alu;
 
+		if (slots[i] && slots[i]->bank_swizzle_force)
+			return 0;
+
 		/* check number of literals */
 		if (prev[i]) {
 			if (r600_bytecode_alu_nliterals(bc, prev[i], literal, &nliteral))
