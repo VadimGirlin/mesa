@@ -37,6 +37,8 @@
 #include <errno.h>
 #include <byteswap.h>
 
+#include "opt_core.h"
+
 /* CAYMAN notes 
 Why CAYMAN got loops for lots of instructions is explained here.
 
@@ -155,6 +157,14 @@ int r600_pipe_shader_create(struct pipe_context *ctx,
 		r600_bytecode_dump(&shader->shader.bc);
 		fprintf(stderr, "______________________________________________________________\n");
 	}
+
+	r = r600_shader_optimize(rctx, shader, dump_shaders);
+	if (r == 0 && dump_shaders) {
+		fprintf(stderr, "#### optimized shader: \n");
+		r600_bytecode_dump(&shader->shader.bc);
+		fprintf(stderr, "______________________________________________________________\n");
+	}
+
 	return r600_pipe_shader(ctx, shader);
 }
 
