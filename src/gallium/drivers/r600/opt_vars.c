@@ -247,10 +247,70 @@ boolean vset_remove(struct vset * s, void * key)
 
 void vset_addset(struct vset * s, struct vset * from)
 {
-	int q;
-	for (q=0; q<from->count; q++)
-		vset_add(s,from->keys[q]);
+	int p1 = 0, p2 = 0;
+	uintptr_t k1,k2;
+	int need_insert = 1;
+
+	while (p2 < from->count && p1 < s->count ) {
+		k1 = s->keys[p1];
+		k2 = from->keys[p2];
+
+		if (k1<k2)
+			p1++;
+		else if (k1 == k2) {
+			p1++;
+			p2++;
+			if (p2>=from->count)
+				need_insert = 0;
+		} else if (k1>k2) {
+			break;
+		}
+	}
+
+	if (need_insert) {
+
+		int maxsize = from->count + s->count;
+		void ** nkeys = malloc(maxsize * sizeof(void*));
+		int p = p1;
+
+		if (p)
+			memcpy(nkeys, s->keys, p * sizeof(void*));
+
+		while (p2 < from->count && p1 < s->count) {
+			k1 = s->keys[p1];
+			k2 = from->keys[p2];
+
+			if (k1<k2) {
+				nkeys[p] = k1;
+				p1++;
+			} else if (k1 == k2) {
+				nkeys[p] = k1;
+				p1++;
+				p2++;
+			} else if (k1>k2) {
+				nkeys[p] = k2;
+				p2++;
+			}
+
+			p++;
+		}
+
+		while (p1 < s->count) {
+			nkeys[p++] = s->keys[p1++];
+		}
+		while (p2 < from->count) {
+			nkeys[p++] = from->keys[p2++];
+		}
+
+		free(s->keys);
+		s->keys = nkeys;
+		s->count = p;
+		s->size = maxsize;
+		assert(p<=maxsize);
+
+	}
 }
+
 
 void vset_addvec(struct vset * s, struct vvec * from)
 {
