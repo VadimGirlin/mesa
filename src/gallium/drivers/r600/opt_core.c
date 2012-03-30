@@ -30,6 +30,7 @@ static void destroy_var(struct var_desc * v)
 {
 	vset_destroy(v->interferences);
 	vset_destroy(v->uses);
+	vset_destroy(v->aff_edges);
 
 	free(v);
 }

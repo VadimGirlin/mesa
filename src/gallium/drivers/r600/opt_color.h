@@ -25,8 +25,6 @@
 #define OPT_COLOR_H_
 
 
-boolean value_equal(struct var_desc * v1, struct var_desc * v2);
-
 /* coloring and coalescing algorithms are based on the
  * Sebastian Hack "Register allocation for programs in SSA form" */
 

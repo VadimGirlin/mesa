@@ -41,7 +41,7 @@ static boolean value_equal_cb(struct var_desc * v1, struct var_desc * v2)
 	return true;
 }
 
-boolean value_equal(struct var_desc * v1, struct var_desc * v2)
+static boolean value_equal(struct var_desc * v1, struct var_desc * v2)
 {
 	assert(v1 != NULL && v2 != NULL);
 
@@ -80,6 +80,15 @@ static int vec_vars_count(struct vvec * vv)
 	return r;
 }
 
+static void add_var_edge(struct var_desc * v, struct affinity_edge * e)
+{
+	if (!v->aff_edges)
+		v->aff_edges = vset_create(1);
+
+	vset_add(v->aff_edges, e);
+}
+
+
 void add_affinity_edge(struct shader_info * info, struct var_desc * v1, struct var_desc * v2, int cost)
 {
 	struct affinity_edge * e;
@@ -105,6 +114,9 @@ void add_affinity_edge(struct shader_info * info, struct var_desc * v1, struct v
 	e->v = v1;
 	e->v2 = v2;
 	vque_enqueue(info->edge_queue, e->cost, e);
+
+	add_var_edge(v1, e);
+	add_var_edge(v2, e);
 }
 
 static void build_a_edges_phi_copy(struct shader_info * info, struct ast_node * node, boolean alu_split)
@@ -870,44 +882,58 @@ static boolean recolor_var(struct shader_info * info, struct var_desc * v, int c
 
 static void get_affine_subset(struct shader_info * info, struct vset * colored, struct var_desc *v, struct vset * cset, int * cur_cost)
 {
-	int cost = 0;
+	int cost = 0, q, w;
 	boolean finished;
+
+	struct vset * new_vars, * new_vars2, * edges, *tmp;
+
+	new_vars = vset_create(1);
+	new_vars2 = vset_create(1);
+	edges = vset_create(1);
 
 	vset_clear(cset);
 
+	vset_add(new_vars, v);
 	vset_remove(colored, v);
-	vset_add(cset, v);
 
 	do {
-		int q;
-		finished = true;
 
-		for (q=0; q<info->edge_queue->count; q++) {
-			struct affinity_edge * e = info->edge_queue->keys[q*2+1];
-			struct var_desc * nv = NULL;
-			boolean c1, c2;
+		for (q = 0; q < new_vars->count; q++) {
+			struct var_desc * nv = new_vars->keys[q];
 
-			if (e->v->chunk != v->chunk || e->v2->chunk != v->chunk)
-				continue;
+			for (w = 0; w < nv->aff_edges->count; w++) {
+				struct affinity_edge * e = nv->aff_edges->keys[w];
 
-			c1 = vset_contains(cset, e->v);
-			c2 = vset_contains(cset, e->v2);
-
-			if (c1 && !c2)
-				nv = e->v2;
-			else if (c2 && !c1)
-				nv = e->v;
-			else
-				continue;
-
-			if (nv != NULL && vset_contains(colored, nv) && vset_add(cset, nv)) {
-				finished = false;
-				cost += e->cost;
-				vset_remove(colored, nv);
+				if (e->v == nv) {
+					if (vset_remove(colored, e->v2)) {
+						vset_add(new_vars2, e->v2);
+						if (vset_add(edges, e))
+							cost += e->cost;
+					}
+				} else {
+					if (vset_remove(colored, e->v)) {
+						vset_add(new_vars2, e->v);
+						if (vset_add(edges, e))
+							cost += e->cost;
+					}
+				}
 			}
 		}
 
-	} while (!finished);
+		tmp = new_vars;
+		new_vars = new_vars2;
+
+		vset_addset(cset, tmp);
+		vset_clear(tmp);
+
+		new_vars2 = tmp;
+
+	} while (new_vars->count>0);
+
+
+	vset_destroy(new_vars);
+	vset_destroy(new_vars2);
+	vset_destroy(edges);
 
 	*cur_cost = cost;
 }

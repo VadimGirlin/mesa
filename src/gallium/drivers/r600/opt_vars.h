@@ -203,6 +203,8 @@ struct var_desc
 	unsigned prio;
 //	enum node_subtype last_use_type;
 	boolean fetch_dep;
+
+	struct vset * aff_edges;
 };
 
 
