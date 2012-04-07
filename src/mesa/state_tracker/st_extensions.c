@@ -629,4 +629,7 @@ void st_init_extensions(struct st_context *st, const driOptionCache * optionCach
          break;
       }
    }
+
+   if (driQueryOptionb(optionCache, "force_glsl_extensions_warn"))
+	   ctx->Const.ForceGLSLExtensionsWarn = 1;
 }
