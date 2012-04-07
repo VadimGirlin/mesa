@@ -27,6 +27,7 @@
 #ifndef _ST_API_H_
 #define _ST_API_H_
 
+#include "drivers/dri/common/xmlconfig.h"
 #include "pipe/p_compiler.h"
 #include "pipe/p_format.h"
 
@@ -243,6 +244,8 @@ struct st_context_attribs
     * The visual of the framebuffers the context will be bound to.
     */
    struct st_visual visual;
+
+   struct driOptionCache * optionCache;
 };
 
 /**
