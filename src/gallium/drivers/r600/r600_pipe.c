@@ -364,6 +364,11 @@ static const char *r600_get_family_name(enum radeon_family family)
 	}
 }
 
+static const char* r600_get_driver_name(struct pipe_screen* pscreen)
+{
+	return "r600g";
+}
+
 static const char* r600_get_name(struct pipe_screen* pscreen)
 {
 	struct r600_screen *rscreen = (struct r600_screen *)pscreen;
@@ -839,6 +844,7 @@ struct pipe_screen *r600_screen_create(struct radeon_winsys *ws)
 	}
 
 	rscreen->screen.destroy = r600_destroy_screen;
+	rscreen->screen.get_driver_name = r600_get_driver_name;
 	rscreen->screen.get_name = r600_get_name;
 	rscreen->screen.get_vendor = r600_get_vendor;
 	rscreen->screen.get_param = r600_get_param;
