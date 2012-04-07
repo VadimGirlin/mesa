@@ -67,6 +67,7 @@ struct pipe_transfer;
 struct pipe_screen {
    void (*destroy)( struct pipe_screen * );
 
+   const char *(*get_driver_name)( struct pipe_screen * );
 
    const char *(*get_name)( struct pipe_screen * );
 
