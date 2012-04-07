@@ -114,6 +114,8 @@ dri_create_context(gl_api api, const struct gl_config * visual,
    driParseConfigFiles(&ctx->optionCache,
 		       &screen->optionCache, sPriv->myNum, driverName);
 
+   attribs.optionCache = &ctx->optionCache;
+
    dri_fill_st_visual(&attribs.visual, screen, visual);
    ctx->st = stapi->create_context(stapi, &screen->base, &attribs, &ctx_err,
 				   st_share);
