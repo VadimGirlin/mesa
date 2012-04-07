@@ -1956,10 +1956,6 @@ static void analyze_vars(struct shader_info * info)
 
 				while (v->value_hint->value_hint)
 					v->value_hint = v->value_hint->value_hint;
-
-
-				if (v->value_hint && (v->flags & VF_PIN_CHAN) && !(v->def && (v->def->flags & AF_CHAN_CONSTRAINT)))
-					v->reg.chan = v->value_hint->reg.chan;
 			}
 		}
 	}
