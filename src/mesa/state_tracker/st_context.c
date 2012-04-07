@@ -111,7 +111,7 @@ st_get_msaa(void)
 
 
 static struct st_context *
-st_create_context_priv( struct gl_context *ctx, struct pipe_context *pipe )
+st_create_context_priv( struct gl_context *ctx, struct pipe_context *pipe, const driOptionCache * optionCache )
 {
    uint i;
    struct st_context *st = ST_CALLOC_STRUCT( st_context );
@@ -171,7 +171,7 @@ st_create_context_priv( struct gl_context *ctx, struct pipe_context *pipe )
 
    /* GL limits and extensions */
    st_init_limits(st);
-   st_init_extensions(st);
+   st_init_extensions(st, optionCache);
 
    return st;
 }
@@ -179,7 +179,8 @@ st_create_context_priv( struct gl_context *ctx, struct pipe_context *pipe )
 
 struct st_context *st_create_context(gl_api api, struct pipe_context *pipe,
                                      const struct gl_config *visual,
-                                     struct st_context *share)
+                                     struct st_context *share,
+                                     const driOptionCache * optionCache)
 {
    struct gl_context *ctx;
    struct gl_context *shareCtx = share ? share->ctx : NULL;
@@ -204,7 +205,7 @@ struct st_context *st_create_context(gl_api api, struct pipe_context *pipe,
    if (debug_get_option_mesa_mvp_dp4())
       _mesa_set_mvp_with_dp4( ctx, GL_TRUE );
 
-   return st_create_context_priv(ctx, pipe);
+   return st_create_context_priv(ctx, pipe, optionCache);
 }
 
 

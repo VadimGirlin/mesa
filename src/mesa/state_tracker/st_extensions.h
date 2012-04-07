@@ -34,7 +34,7 @@ struct st_context;
 
 extern void st_init_limits(struct st_context *st);
 
-extern void st_init_extensions(struct st_context *st);
+extern void st_init_extensions(struct st_context *st, const driOptionCache * optionCache);
 
 
 #endif /* ST_EXTENSIONS_H */

@@ -325,7 +325,7 @@ static void init_format_extensions(struct st_context *st,
  * features or can be built on top of other gallium features.
  * Some fine tuning may still be needed.
  */
-void st_init_extensions(struct st_context *st)
+void st_init_extensions(struct st_context *st, const driOptionCache * optionCache)
 {
    struct pipe_screen *screen = st->pipe->screen;
    struct gl_context *ctx = st->ctx;

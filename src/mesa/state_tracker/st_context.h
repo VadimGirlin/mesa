@@ -281,7 +281,8 @@ st_get_msaa(void);
 extern struct st_context *
 st_create_context(gl_api api, struct pipe_context *pipe,
                   const struct gl_config *visual,
-                  struct st_context *share);
+                  struct st_context *share,
+                  const driOptionCache * optionCache);
 
 extern void
 st_destroy_context(struct st_context *st);
