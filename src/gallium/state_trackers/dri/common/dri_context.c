@@ -36,6 +36,7 @@
 #include "dri_context.h"
 
 #include "pipe/p_context.h"
+#include "pipe/p_screen.h"
 #include "state_tracker/st_context.h"
 
 static void
@@ -64,6 +65,8 @@ dri_create_context(gl_api api, const struct gl_config * visual,
    struct st_context_iface *st_share = NULL;
    struct st_context_attribs attribs;
    enum st_context_error ctx_err = 0;
+   struct pipe_screen * pscreen = screen->base.screen;
+   const char *driverName;
 
    memset(&attribs, 0, sizeof(attribs));
    switch (api) {
@@ -103,8 +106,13 @@ dri_create_context(gl_api api, const struct gl_config * visual,
    ctx->cPriv = cPriv;
    ctx->sPriv = sPriv;
 
+   if (pscreen->get_driver_name)
+	   driverName = pscreen->get_driver_name(pscreen);
+   else
+	   driverName = "dri";
+
    driParseConfigFiles(&ctx->optionCache,
-		       &screen->optionCache, sPriv->myNum, "dri");
+		       &screen->optionCache, sPriv->myNum, driverName);
 
    dri_fill_st_visual(&attribs.visual, screen, visual);
    ctx->st = stapi->create_context(stapi, &screen->base, &attribs, &ctx_err,
