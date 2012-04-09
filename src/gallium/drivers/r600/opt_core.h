@@ -200,8 +200,12 @@ enum shader_opt_result
 
 	/* optimization skipped due to relative addressing usage */
 	SR_SKIP_RELADDR,
+
 	/* post_schedule failed */
-	SR_FAIL_SCHEDULE
+	SR_FAIL_SCHEDULE,
+
+	/* insert_copies failed */
+	SR_FAIL_INSERT_COPIES
 };
 
 struct shader_info

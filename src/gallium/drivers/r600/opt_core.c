@@ -2885,6 +2885,97 @@ static void propagate_copy(struct shader_info * info)
 	propagate_copy_node(info, info->root);
 }
 
+static boolean insert_copies_phi(struct shader_info * info,
+		struct ast_node * node)
+{
+	int q;
+	boolean r = true;
+	struct var_desc * o = node->outs->keys[0];
+
+	if (!o || (o->flags & VF_DEAD))
+		return r;
+
+	for (q=0; q<node->ins->count; q++) {
+		struct var_desc * i = node->ins->keys[q];
+
+		if (o->color != i->color) {
+			r = false;
+			R600_DUMP("uncoalesced phi: ");
+			print_var(o);
+			R600_DUMP(" <= ");
+			print_var(i);
+			R600_DUMP("\n");
+		}
+	}
+
+	return r;
+}
+
+
+static boolean insert_copies_pcopy(struct shader_info * info,
+		struct ast_node * node)
+{
+	int q;
+	boolean r = true;
+
+	assert(node->ins->count == node->outs->count);
+
+	for (q=0; q<node->outs->count; q++) {
+		struct var_desc * o = node->outs->keys[q];
+		struct var_desc * i = node->ins->keys[q];
+
+		if (!o || (o->flags & VF_DEAD))
+			continue;
+
+		if (o->color != i->color) {
+			r = false;
+			R600_DUMP("uncoalesced pcopy: ");
+			print_var(o);
+			R600_DUMP(" <= ");
+			print_var(i);
+			R600_DUMP("\n");
+		}
+	}
+
+	return r;
+}
+
+static boolean insert_copies_node(struct shader_info * info,
+		struct ast_node * node)
+{
+	boolean r = true;
+
+	if (node->flags & AF_DEAD)
+		return true;
+
+	if (node->subtype == NST_PHI)
+		r &= insert_copies_phi(info, node);
+	else if (node->subtype == NST_PCOPY)
+		r &= insert_copies_pcopy(info, node);
+
+	if (node->phi)
+		r &= insert_copies_node(info, node->phi);
+	if (node->loop_phi)
+		r &= insert_copies_node(info, node->loop_phi);
+	if (node->p_split)
+		r &= insert_copies_node(info, node->p_split);
+	if (node->p_split_outs)
+		r &= insert_copies_node(info, node->p_split_outs);
+	if (node->child)
+		r &= insert_copies_node(info, node->child);
+	if (node->rest)
+		r &= insert_copies_node(info, node->rest);
+
+	return r;
+}
+
+/* we need to insert the copies when some vars in the live intervals split
+ * nodes or phi nodes weren't coalesced */
+static boolean insert_copies(struct shader_info * info)
+{
+	return insert_copies_node(info, info->root);
+}
+
 static boolean create_shader_tree(struct shader_info * info)
 {
 	info->vars = vmap_create(32);
@@ -2920,11 +3011,17 @@ static boolean create_shader_tree(struct shader_info * info)
 	reset_interferences(info);
 	liveness(info);
 
-
 	/* initial register allocation */
 
 	color(info);
 	coalesce(info);
+
+	/* check for not coalesced phi and psplit (parallel copy for live
+	 * intervals splitting) vars, and insert copies if needed */
+	if (!insert_copies(info)) {
+		info->result_code = SR_FAIL_INSERT_COPIES;
+		return false;
+	}
 
 	dump_var_table(info);
 	dump_shader_tree(info);
@@ -3056,6 +3153,9 @@ int r600_shader_optimize(struct r600_context * rctx, struct r600_pipe_shader *pi
 			case SR_FAIL_SCHEDULE:
 				printf("scheduler failure\n");
 				assert(0);
+				break;
+			case SR_FAIL_INSERT_COPIES:
+				printf("need insert_copies pass (not implemented yet)\n");
 				break;
 			case SR_SKIP_RELADDR:
 				printf("relative addressing\n");
