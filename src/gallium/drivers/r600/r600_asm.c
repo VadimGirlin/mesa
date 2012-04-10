@@ -702,22 +702,19 @@ static int reserve_cfile(struct r600_bytecode *bc, struct alu_bank_swizzle *bs, 
 
 static int is_gpr(unsigned sel)
 {
-	return (sel >= 0 && sel <= 127);
+	return (sel < BC_NUM_REGISTERS);
 }
 
-/* CB constants start at 512, and get translated to a kcache index when ALU
- * clauses are constructed. Note that we handle kcache constants the same way
- * as (the now gone) cfile constants, is that really required? */
-static int is_cfile(unsigned sel)
+/* CB constants start at BC_KCACHE_OFFSET, and get translated to a kcache index
+ * when ALU clauses are constructed. */
+static int is_kcache(unsigned sel)
 {
-	return (sel > 255 && sel < 512) ||
-		(sel > 511 && sel < 4607) || /* Kcache before translation. */
-		(sel > 127 && sel < 192); /* Kcache after translation. */
+	return (sel >= BC_KCACHE_OFFSET);
 }
 
 static int is_const(int sel)
 {
-	return is_cfile(sel) ||
+	return is_kcache(sel) ||
 		(sel >= V_SQ_ALU_SRC_0 &&
 		sel <= V_SQ_ALU_SRC_LITERAL);
 }
@@ -742,7 +739,7 @@ static int check_vector(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
 				if (r)
 					return r;
 			}
-		} else if (is_cfile(sel)) {
+		} else if (is_kcache(sel)) {
 			r = reserve_cfile(bc, bs, (alu->src[src].kc_bank<<16) + sel, elem);
 			if (r)
 				return r;
@@ -769,7 +766,7 @@ static int check_scalar(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
 			else
 				const_count++;
 		}
-		if (is_cfile(sel)) {
+		if (is_kcache(sel)) {
 			r = reserve_cfile(bc, bs, (alu->src[src].kc_bank<<16) + sel, elem);
 			if (r)
 				return r;
@@ -789,7 +786,7 @@ static int check_scalar(struct r600_bytecode *bc, struct r600_bytecode_alu *alu,
 				return r;
 		}
 		/* PV PS restrictions */
-		if (const_count && (sel == 254 || sel == 255)) {
+		if (const_count && (sel == V_SQ_ALU_SRC_PS || sel == V_SQ_ALU_SRC_PV)) {
 			cycle = cycle_for_bank_swizzle_scl[bank_swizzle][src];
 			if (cycle < const_count)
 				return -1;
@@ -1246,11 +1243,11 @@ static int r600_bytecode_alloc_inst_kcache_lines(struct r600_bytecode *bc,
 	for (i = 0; i < 3; i++) {
 		unsigned bank, line, sel = alu->src[i].sel;
 
-		if (sel < 512)
+		if (sel < BC_KCACHE_OFFSET)
 			continue;
 
 		bank = alu->src[i].kc_bank;
-		line = (sel-512)>>4;
+		line = (sel-BC_KCACHE_OFFSET)>>4;
 
 		if ((r = r600_bytecode_alloc_kcache_line(bc, kcache, bank, line)))
 			return r;
@@ -1269,10 +1266,10 @@ static int r600_bytecode_assign_kcache_banks(struct r600_bytecode *bc,
 		static const unsigned int base[] = {128, 160, 256, 288};
 		unsigned int line, sel = alu->src[i].sel, found = 0;
 
-		if (sel < 512)
+		if (sel < BC_KCACHE_OFFSET)
 			continue;
 
-		sel -= 512;
+		sel -= BC_KCACHE_OFFSET;
 		line = sel>>4;
 
 		for (j = 0; j < 4 && !found; ++j) {
@@ -1286,7 +1283,7 @@ static int r600_bytecode_assign_kcache_banks(struct r600_bytecode *bc,
 						kcache[j].addr <= line &&
 						line < kcache[j].addr + kcache[j].mode) {
 					alu->src[i].sel = sel - (kcache[j].addr<<4);
-					alu->src[i].sel += base[j];
+					alu->src[i].sel += base[j] + BC_KCACHE_FINAL_OFFSET;
 					found=1;
 			    }
 			}
@@ -1459,7 +1456,7 @@ int r600_bytecode_add_alu_type(struct r600_bytecode *bc, const struct r600_bytec
 	}
 	/* number of gpr == the last gpr used in any alu */
 	for (i = 0; i < 3; i++) {
-		if (nalu->src[i].sel >= bc->ngpr && nalu->src[i].sel < 128) {
+		if (nalu->src[i].sel >= bc->ngpr && nalu->src[i].sel < BC_NUM_REGISTERS) {
 			bc->ngpr = nalu->src[i].sel + 1;
 		}
 		if (nalu->src[i].sel == V_SQ_ALU_SRC_LITERAL)
