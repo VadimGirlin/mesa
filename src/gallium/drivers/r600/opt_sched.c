@@ -21,7 +21,11 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "eg_sq.h"
+
 #include "opt_core.h"
+
+#define MAX_ALU_COUNT 128
 
 static void clear_interferences(struct var_desc * v)
 {
@@ -720,9 +724,9 @@ static boolean sched_cbs_try_slot(struct scheduler_ctx * ctx, struct ast_node * 
 				if (!v) { /* const */
 					int sel = n->alu->src[q].sel;
 
-					if (sel>=512) {/* kcache constant */
+					if (sel>=BC_KCACHE_OFFSET) {/* kcache constant */
 						int chan = n->alu->src[q].chan;
-						int cpair = (n->alu->src[q].kc_bank<<20) + ((sel-512)<<1) + (chan>>1) + 1;
+						int cpair = (n->alu->src[q].kc_bank<<20) + ((sel-BC_KCACHE_OFFSET)<<1) + (chan>>1) + 1;
 						if (!sched_cbs_reserve_cpair(ctx, cpair)) {
 							sched_cbs_rollback(ctx, CBS_RES_CONST);
 							return false;
@@ -1220,8 +1224,8 @@ static boolean sched_alloc_kcache(struct scheduler_ctx * ctx)
 			for (w=0; w<c->ins->count; w++) {
 				int sel = c->alu->src[w].sel;
 
-				if (sel>=512) {
-					if (r600_bytecode_alloc_kcache_line(&ctx->info->shader->bc, kcache, c->alu->src[w].kc_bank, (sel-512)>>4))
+				if (sel>=BC_KCACHE_OFFSET) {
+					if (r600_bytecode_alloc_kcache_line(&ctx->info->shader->bc, kcache, c->alu->src[w].kc_bank, (sel-BC_KCACHE_OFFSET)>>4))
 						return false;
 				}
 			}
@@ -1261,7 +1265,7 @@ static void sched_check_clause_limits(struct scheduler_ctx * ctx)
 		split = true;
 	else {
 		ctx->alu_slot_count += ctx->group_inst_count + literal_slot_count;
-		if (ctx->alu_slot_count>128)
+		if (ctx->alu_slot_count > MAX_ALU_COUNT)
 			split = true;
 	}
 
