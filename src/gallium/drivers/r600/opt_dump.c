@@ -259,24 +259,14 @@ static void print_src(struct r600_bytecode_alu_src * src)
 	fprint_alu_src(stderr, src);
 }
 
-static void fprint_alu_dst(FILE * f, struct r600_bytecode_alu_dst * dst) {
+static void fprint_alu_dst(FILE * f, struct r600_bytecode_alu_dst * dst)
+{
 	boolean prchan=true;
 
 	unsigned sel = dst->sel;
 
-
-	if (dst->write) {
-		if (sel<128)
-			fprintf(f, "R%u", sel);
-		else if (sel<160)
-			fprintf(f, "KC0[%u]", sel-128);
-		else if (sel<192)
-			fprintf(f, "KC1[%u]", sel-160);
-		else if (sel>=256)
-			fprintf(f, "C%u",sel-256);
-		else
-			fprintf(f,"V%u",sel);
-	}
+	if (dst->write)
+		fprintf(f, "R%u", sel);
 	else
 		fprintf(f,"__");
 
