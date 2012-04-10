@@ -252,8 +252,8 @@ void vset_addset(struct vset * s, struct vset * from)
 	int need_insert = 1;
 
 	while (p2 < from->count && p1 < s->count ) {
-		k1 = s->keys[p1];
-		k2 = from->keys[p2];
+		k1 = (uintptr_t)s->keys[p1];
+		k2 = (uintptr_t)from->keys[p2];
 
 		if (k1<k2)
 			p1++;
@@ -277,18 +277,18 @@ void vset_addset(struct vset * s, struct vset * from)
 			memcpy(nkeys, s->keys, p * sizeof(void*));
 
 		while (p2 < from->count && p1 < s->count) {
-			k1 = s->keys[p1];
-			k2 = from->keys[p2];
+			k1 = (uintptr_t)s->keys[p1];
+			k2 = (uintptr_t)from->keys[p2];
 
 			if (k1<k2) {
-				nkeys[p] = k1;
+				nkeys[p] = (void*)k1;
 				p1++;
 			} else if (k1 == k2) {
-				nkeys[p] = k1;
+				nkeys[p] = (void*)k1;
 				p1++;
 				p2++;
 			} else if (k1>k2) {
-				nkeys[p] = k2;
+				nkeys[p] = (void*)k2;
 				p2++;
 			}
 

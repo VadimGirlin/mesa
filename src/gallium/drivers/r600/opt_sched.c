@@ -251,7 +251,6 @@ static enum node_subtype gs_prio_get_node_subtype(struct ast_node * node)
 static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * node)
 {
 	unsigned pri = 0, max_child_prio = 0;
-	boolean writes_am = false;
 
 	if (node->flags & AF_DEAD)
 		return 0;
@@ -286,8 +285,6 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 			if (v && !(v->flags & VF_DEAD)) {
 				if (v->prio > pri)
 					pri = v->prio;
-				if (v->reg.reg == REG_AM)
-					writes_am = true;
 			}
 		}
 	}

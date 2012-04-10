@@ -883,7 +883,6 @@ static boolean recolor_var(struct shader_info * info, struct var_desc * v, int c
 static void get_affine_subset(struct shader_info * info, struct vset * colored, struct var_desc *v, struct vset * cset, int * cur_cost)
 {
 	int cost = 0, q, w;
-	boolean finished;
 
 	struct vset * new_vars, * new_vars2, * edges, *tmp;
 
