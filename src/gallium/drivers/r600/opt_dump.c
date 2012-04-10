@@ -192,55 +192,56 @@ static void fprint_alu_src(FILE * f, struct r600_bytecode_alu_src * src)
 	if (src->abs)
 		fprintf(f, "|");
 
-	if (sel<128)
+	if (sel<BC_NUM_REGISTERS)
 		fprintf(f, "R%u", sel);
-	else if (sel<160)
-		fprintf(f, "KC0[%u]", sel-128);
-	else if (sel<192)
-		fprintf(f, "KC1[%u]", sel-160);
-	else if (sel>=256) {
-		if (sel>=512)
-			fprintf(f, "CC%u",sel-512);
-		else if (sel>=448)
-			fprintf(f, "Param%u",sel-448);
+	else if (sel<BC_KCACHE_OFFSET) {
+		if (sel >= V_SQ_ALU_SRC_PARAM_BASE)
+			fprintf(f, "Param%u", sel-V_SQ_ALU_SRC_PARAM_BASE);
+		else {
+			switch (sel) {
+			case V_SQ_ALU_SRC_0:
+				fprintf(f,"0");
+				prchan=false;
+				break;
+			case V_SQ_ALU_SRC_1:
+				fprintf(f,"1.0f");
+				prchan=false;
+				break;
+			case V_SQ_ALU_SRC_1_INT:
+				fprintf(f,"1");
+				prchan=false;
+				break;
+			case V_SQ_ALU_SRC_M_1_INT:
+				fprintf(f,"-1");
+				prchan=false;
+				break;
+			case V_SQ_ALU_SRC_0_5:
+				fprintf(f,"0.5f");
+				prchan=false;
+				break;
+			case V_SQ_ALU_SRC_LITERAL:
+				fprintf(f,"( %f [0x%08X] )", *(float*)&src->value, src->value); prchan=false;
+				break;
+			case V_SQ_ALU_SRC_PV:
+				fprintf(f,"PV");
+				break;
+			case V_SQ_ALU_SRC_PS:
+				fprintf(f,"PS"); prchan=false;
+				break;
+			default:
+				fprintf(f,"special_val_%u",sel-BC_INLINE_OFFSET);
+			}
+		}
+	} else {
+		sel -= BC_KCACHE_OFFSET;
+		if (sel<160)
+			fprintf(f, "KC0[%u]", sel-128);
+		else if (sel<192)
+			fprintf(f, "KC1[%u]", sel-160);
 		else if (sel>=288)
 			fprintf(f, "KC3[%u]",sel-288);
 		else if (sel>=256)
 			fprintf(f, "KC2[%u]",sel-256);
-	} else {
-		switch (sel) {
-		case V_SQ_ALU_SRC_0:
-			fprintf(f,"0");
-			prchan=false;
-			break;
-		case V_SQ_ALU_SRC_1:
-			fprintf(f,"1.0f");
-			prchan=false;
-			break;
-		case V_SQ_ALU_SRC_1_INT:
-			fprintf(f,"1");
-			prchan=false;
-			break;
-		case V_SQ_ALU_SRC_M_1_INT:
-			fprintf(f,"-1");
-			prchan=false;
-			break;
-		case V_SQ_ALU_SRC_0_5:
-			fprintf(f,"0.5f");
-			prchan=false;
-			break;
-		case V_SQ_ALU_SRC_LITERAL:
-			fprintf(f,"( %f [0x%08X] )", *(float*)&src->value, src->value); prchan=false;
-			break;
-		case V_SQ_ALU_SRC_PV:
-			fprintf(f,"PV");
-			break;
-		case V_SQ_ALU_SRC_PS:
-			fprintf(f,"PS"); prchan=false;
-			break;
-		default:
-			fprintf(f,"V%u",sel);
-		}
 	}
 
 	if (rel)

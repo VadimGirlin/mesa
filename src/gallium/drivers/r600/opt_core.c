@@ -373,7 +373,7 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 		if (alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOVA_INT && !alu->is_op3)
 			an->outs->keys[0] = get_var(info, REG_AR, 0, 0);
 		else
-			an->outs->keys[0] = (alu->dst.sel<128 && write) ? get_var(info, alu->dst.sel, alu->dst.chan, 0) : NULL;
+			an->outs->keys[0] = (alu->dst.sel<BC_NUM_REGISTERS && write) ? get_var(info, alu->dst.sel, alu->dst.chan, 0) : NULL;
 
 		if (alu->dst.rel)
 			return 0;
@@ -405,7 +405,11 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 
 			int sel = alu->src[i].sel;
 
-			if ((sel>=128 && sel<192) || (sel>=256 && sel<320)) {
+			if (sel >= BC_KCACHE_OFFSET) {
+
+				sel -= BC_KCACHE_OFFSET;
+
+				assert((sel>=128 && sel<192) || (sel>=256 && sel<320));
 
 				/* restore kcache addr for r600_bytecode_alloc_kcache_lines */
 
@@ -421,10 +425,10 @@ static int parse_cf_alu(struct shader_info * info, struct ast_node * node, struc
 
 				kc_addr = (cf->kcache[kc_set].addr<<4) + (sel&0x1F);
 
-				alu->src[i].sel = 512 + kc_addr;
+				alu->src[i].sel = BC_KCACHE_OFFSET + kc_addr;
 			}
 
-			if (alu->src[i].sel < 128)
+			if (alu->src[i].sel < BC_NUM_REGISTERS)
 				v = get_var(info, alu->src[i].sel, alu->src[i].chan, 0);
 			else if (alu->src[i].sel == V_SQ_ALU_SRC_PV || alu->src[i].sel == V_SQ_ALU_SRC_PS) {
 				int prev_slot = (alu->src[i].sel == V_SQ_ALU_SRC_PS) ? 4 : alu->src[i].chan;
@@ -916,7 +920,7 @@ static void variables_defined(struct shader_info * info, struct ast_node * node)
 			for (q=0; q<node->vars_defined->count; q++) {
 				struct var_desc * v = node->vars_defined->keys[q];
 				if (v && ((v->reg.reg == REG_PR) ||
-						(v->reg.reg < 128 && v->reg.reg >= 128-info->temp_gprs))) {
+						(v->reg.reg < BC_NUM_REGISTERS && v->reg.reg >= BC_NUM_REGISTERS-info->temp_gprs))) {
 					vset_remove(node->vars_defined, v);
 					q--;
 				}
@@ -2700,14 +2704,14 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 			print_var(sv);
 		dump_node(info, node, 0);
 
-		if (!sv && src->sel>=512 && node->const_ins_count == 2) {
+		if (!sv && src->sel>=BC_KCACHE_OFFSET && node->const_ins_count == 2) {
 			int t, k=0;
 
 			for (t=0; t<node->ins->count; t++) {
 				if (t==index)
 					continue;
 
-				if (node->alu->src[t].sel>=512)
+				if (node->alu->src[t].sel>=BC_KCACHE_OFFSET)
 					if (++k == 2)
 						return false;
 			}
@@ -2735,14 +2739,14 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 			d->value = src->value;
 
 			if (m->flags & AF_ALU_CLAMP_DST) {
-				if (src->sel>=512)
+				if (src->sel>=BC_KCACHE_OFFSET)
 					return false;
 				else if (src->sel == V_SQ_ALU_SRC_LITERAL) {
 					d->value = clamp(d->value);
 				}
 			}
 
-			if (node->flags & AF_FOUR_SLOTS_INST && src->sel>=512) {
+			if (node->flags & AF_FOUR_SLOTS_INST && src->sel>=BC_KCACHE_OFFSET) {
 				struct ast_node * g[4];
 				struct vset * csel = vset_create(3);
 				int w,e;
@@ -2754,7 +2758,7 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 				for (w=0; w<4; w++) {
 					struct ast_node * r = g[w];
 					for (e=0; e<r->ins->count; e++) {
-						if (r->alu->src[e].sel>=512) {
+						if (r->alu->src[e].sel>=BC_KCACHE_OFFSET) {
 							VSET_ADD(csel, CPAIR_KEY(r->alu->src[e].sel,r->alu->src[e].chan));
 
 							if (csel->count>2) {
@@ -2770,7 +2774,7 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 
 
 			d->sel = src->sel;
-			d->chan = (src->sel>=512) ? src->chan : 0;
+			d->chan = (src->sel>=BC_KCACHE_OFFSET) ? src->chan : 0;
 			node->ins->keys[index] = NULL;
 			node->const_ins_count++;
 		}
@@ -2794,7 +2798,7 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 	} else if (node->op_class == NOC_CF_EXPORT && node->cf->output.burst_count==1) {
 		struct r600_bytecode_alu_src * src = &m->alu->src[0];
 
-		if (src->sel >= 248 && src->sel<=253) {
+		if (src->sel >= V_SQ_ALU_SRC_0 && src->sel <= V_SQ_ALU_SRC_LITERAL) {
 			union fui val, zero, one;
 			val.f = get_const_val(src);
 			zero.f = 0.0f;
@@ -2814,7 +2818,7 @@ static boolean propagate_copy_input(struct shader_info * info, struct ast_node *
 	} else if (node->subtype == NST_TEX_INST) {
 		struct r600_bytecode_alu_src * src = &m->alu->src[0];
 
-		if (src->sel >= 248 && src->sel<=253) {
+		if (src->sel >= V_SQ_ALU_SRC_0 && src->sel <= V_SQ_ALU_SRC_LITERAL) {
 			union fui val, zero, one;
 			val.f = get_const_val(src);
 			zero.f = 0.0f;
