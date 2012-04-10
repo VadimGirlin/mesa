@@ -710,7 +710,7 @@ static int tgsi_split_constant(struct r600_shader_ctx *ctx)
 
 		if (ctx->src[i].rel) {
 			int treg = r600_get_temp(ctx);
-			if ((r = tgsi_fetch_rel_const(ctx, ctx->src[i].sel - 512, treg)))
+			if ((r = tgsi_fetch_rel_const(ctx, ctx->src[i].sel - BC_KCACHE_OFFSET, treg)))
 				return r;
 
 			ctx->src[i].sel = treg;
@@ -893,7 +893,7 @@ static int r600_shader_from_tgsi(struct r600_context * rctx, struct r600_pipe_sh
 
 	/* Outside the GPR range. This will be translated to one of the
 	 * kcache banks later. */
-	ctx.file_offset[TGSI_FILE_CONSTANT] = 512;
+	ctx.file_offset[TGSI_FILE_CONSTANT] = BC_KCACHE_OFFSET;
 
 	ctx.file_offset[TGSI_FILE_IMMEDIATE] = V_SQ_ALU_SRC_LITERAL;
 	ctx.bc->ar_reg = ctx.file_offset[TGSI_FILE_TEMPORARY] +
@@ -1045,7 +1045,7 @@ static int r600_shader_from_tgsi(struct r600_context * rctx, struct r600_pipe_sh
 				alu.src[0].sel = shader->output[ctx.cv_output].gpr;
 				alu.src[0].chan = j;
 
-				alu.src[1].sel = 512 + i;
+				alu.src[1].sel = BC_KCACHE_OFFSET + i;
 				alu.src[1].kc_bank = 1;
 				alu.src[1].chan = j;
 
