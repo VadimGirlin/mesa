@@ -152,8 +152,6 @@ static struct ast_node * create_alu_copy(struct shader_info * info, struct var_d
 	n->alu = calloc(1, sizeof(struct r600_bytecode_alu));
 	n->alu->inst = EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOV;
 
-	dst->value_hint = src;
-
 	return n;
 }
 
@@ -1810,9 +1808,6 @@ static void check_copy(struct shader_info * info, struct var_desc * v)
 		return;
 	}
 
-	if (src && src->def && src->def->flags & AF_SPLIT_COPY)
-		src = src->value_hint;
-
 	v->value_hint = src;
 }
 
@@ -1837,48 +1832,62 @@ static struct ast_node * get_real_def_node(struct var_desc * v)
 	return d;
 }
 
-static void check_copy2(struct shader_info * info, struct var_desc * v)
+static void propagate_clamp(struct shader_info * info, struct var_desc * v)
 {
 	struct var_desc * s = v->value_hint;
 	struct ast_node *vdef = get_real_def_node(v);
 	struct ast_node *sdef = get_real_def_node(s);
+	boolean propagate = false;
 
-	R600_DUMP( "check_copy2: ");
+	R600_DUMP( "propagate_clamp : checking copy ");
 	print_var(v);
 	R600_DUMP( " from ");
 	print_var(s);
 	R600_DUMP( "\n");
 
-	if (vdef && (vdef->flags & AF_ALU_CLAMP_DST) && s->def &&
-			sdef->alu && !(sdef->flags & AF_ALU_CLAMP_DST) /*&& !(sdef->flags & AF_SPLIT_COPY)*/) {
-		boolean can_propagate = true;
+	if (vdef && (vdef->flags & AF_ALU_CLAMP_DST) && s->def && sdef->alu) {
 		int q;
 
-		R600_DUMP( "check_copy2: clamp propagation: checking src usage ...\n");
+		propagate = true;
 
-		if (s->uses) {
-			for (q=0; q<s->uses->count; q++) {
-				struct ast_node * u = s->uses->keys[q];
+		if (!(sdef->flags & AF_ALU_CLAMP_DST)) {
 
-				if (u != v->def) {
-					if (!(u->flags & AF_DEAD) && (!(u->flags & AF_COPY_HINT) || !(u->flags & AF_ALU_CLAMP_DST))) {
-						can_propagate = false;
-						R600_DUMP( "check_copy2: can't propagate ");
-						dump_node(info, u, 0);
-						break;
+			R600_DUMP( "propagate_clamp: clamp propagation: checking src usage ...\n");
+
+			if (s->uses) {
+				for (q=0; q<s->uses->count; q++) {
+					struct ast_node * u = s->uses->keys[q];
+
+					if (u != v->def) {
+						if (!(u->flags & AF_DEAD) && (!(u->flags & AF_COPY_HINT) || !(u->flags & AF_ALU_CLAMP_DST))) {
+							propagate = false;
+							R600_DUMP( "propagate_clamp: can't propagate ");
+							dump_node(info, u, 0);
+							break;
+						}
 					}
 				}
 			}
+
+			if (propagate) {
+				sdef->flags |= AF_ALU_CLAMP_DST;
+				R600_DUMP("  propagated to ");
+				print_var(s);
+				R600_DUMP(" def\n");
+			}
+
 		}
-
-		if (can_propagate)
-			sdef->flags |= AF_ALU_CLAMP_DST;
-
-
 	}
 
-	if (s->value_hint)
-		check_copy2(info, s);
+	if (!propagate && (vdef->flags & AF_SPLIT_COPY) && (v->def->flags & AF_ALU_CLAMP_DST)) {
+			vdef->flags &= ~AF_ALU_CLAMP_DST;
+			R600_DUMP("  reverted clamp for ");
+			print_var(v);
+			R600_DUMP("\n");
+	}
+
+	if (propagate && s->value_hint)
+		propagate_clamp(info, s);
 }
 
 static void analyze_vars(struct shader_info * info)
@@ -1961,7 +1970,7 @@ static void analyze_vars(struct shader_info * info)
 				continue;
 
 			if ((v->def->flags & AF_COPY_HINT) && v->value_hint)
-				check_copy2(info, v);
+				propagate_clamp(info, v);
 		}
 	}
 
@@ -3043,6 +3052,9 @@ static boolean create_shader_tree(struct shader_info * info)
 	propagate_copy(info);
 	reset_interferences(info);
 	liveness(info);
+
+	dump_shader_tree(info);
+	dump_var_table(info);
 
 	analyze_vars(info);
 
