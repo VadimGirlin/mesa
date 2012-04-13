@@ -199,7 +199,9 @@ static void gs_schedule_node(struct shader_info * info, struct ast_node * node)
 static void create_group_iovecs(struct ast_node * g)
 {
 	struct ast_node *l = g->child;
-	int ic = 0, oc = 0;
+	int ic = 0, oc = 0, q;
+
+	struct vset * ins;
 
 	assert (g->subtype == NST_ALU_GROUP);
 
@@ -216,15 +218,20 @@ static void create_group_iovecs(struct ast_node * g)
 	else
 		vvec_clear(g->outs);
 
+	ins = vset_create(8, 1);
+
 	while (l && l->child) {
 		struct ast_node * n = l->child;
-		int q;
 
 		for (q=0; q<n->outs->count; q++)
 			g->outs->keys[oc++] = n->outs->keys[q];
 
-		for (q=0; q<n->ins->count; q++)
-			g->ins->keys[ic++] = n->ins->keys[q];
+		for (q=0; q<n->ins->count; q++) {
+			struct var_desc * v = n->ins->keys[q];
+			g->ins->keys[ic++] = v;
+			if (v)
+				vset_add(ins, v);
+		}
 
 		l = l->rest;
 	}
@@ -237,6 +244,14 @@ static void create_group_iovecs(struct ast_node * g)
 
 	while(oc<g->outs->count)
 		g->outs->keys[oc++] = NULL;
+
+	struct rc_constraint * bs = calloc(1,sizeof(struct rc_constraint));
+	bs->comps = vvec_create(ins->count);
+	for (q=0; q<ins->count; q++) {
+		struct var_desc * v = ins->keys[q];
+		bs->comps->keys[q] = v;
+		v->bs_constraint = bs;
+	}
 }
 
 
