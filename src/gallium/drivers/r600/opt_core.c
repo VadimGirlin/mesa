@@ -2938,17 +2938,16 @@ static void propagate_copy_node(struct shader_info * info, struct ast_node * nod
 			return;
 
 		for (q=0; q<node->ins->count; q++) {
-			struct var_desc * v = node->ins->keys[q], *vv;
+			struct var_desc * v = node->ins->keys[q], *vv = v;
 
 			if (!v || (v->flags & VF_DEAD))
 				continue;
 
-			vv = v->value_hint ? v->value_hint : v;
+			/* jump through the split copy nodes */
+			while (vv->def && (vv->def->flags & AF_SPLIT_COPY))
+				vv = vv->def->ins->keys[0];
 
-			 if (!vv->def)
-				 continue;
-
-			if (vv->def->alu && !vv->def->alu->is_op3 &&
+			if (vv->def && vv->def->alu && !vv->def->alu->is_op3 &&
 					vv->def->alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOV &&
 					!(vv->def->flags & AF_SPLIT_COPY)) {
 
