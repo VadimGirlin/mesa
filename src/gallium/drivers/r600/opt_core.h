@@ -86,7 +86,12 @@ enum ast_flags
 
 	/* alu clause split (due to instruction count limit, kcache lines limit, ... */
 	/* set on the last group of the clause */
-	AF_ALU_CLAUSE_SPLIT = (1<<13)
+	AF_ALU_CLAUSE_SPLIT = (1<<13),
+
+
+	AF_SPLIT_COPY = (1<<14)
+
+
 
 };
 
@@ -165,9 +170,6 @@ struct ast_node
 	struct ast_node * phi;
 	struct ast_node * loop_phi;
 
-	struct ast_node * p_split;
-	struct ast_node * p_split_outs;
-
 	struct r600_bytecode_cf * cf;
 	struct r600_bytecode_alu * alu;
 	struct r600_bytecode_tex * tex;
@@ -233,6 +235,8 @@ struct shader_info
 
 	struct vmap * vars;
 
+	uintptr_t next_var_key;
+
 	struct r600_bytecode * bc;
 
 	/* used during bytecode build */
@@ -260,6 +264,8 @@ struct shader_info
 	boolean liveness_correct;
 
 	struct vmap * fetch_levels;
+
+	struct r600_bytecode_cf* last_export[3];
 };
 
 

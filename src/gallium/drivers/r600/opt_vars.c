@@ -28,6 +28,8 @@
 
 #include "opt_core.h"
 
+#define VKEY_VAL(mode, ptr) (mode == 0 ? ((uintptr_t)ptr) : (*(uintptr_t*)ptr))
+
 struct vvec * vvec_create(unsigned initial_size)
 {
 	struct vvec * s = calloc(1, sizeof(struct vvec));
@@ -106,12 +108,14 @@ struct vvec * vvec_createcopy(struct vvec * s)
 	return v;
 }
 
-struct vset* vset_create(unsigned initial_size)
+struct vset* vset_create(unsigned initial_size, unsigned sort_mode)
 {
 	struct vset * s = malloc(sizeof(struct vset));
 
 	if (!s)
 		return NULL;
+
+	s->sort_mode = sort_mode;
 	s->size=initial_size > 0 ? initial_size : 1;
 	s->count=0;
 	s->keys = malloc(s->size * sizeof(void *));
@@ -138,9 +142,9 @@ int vset_get_pos(struct vset * s, void * key)
 		return 0;
 	do {
 		c = (a + b)>>1;
-		if (c == s->count || s->keys[c] == key)
+		if (c == s->count || VKEY_VAL(s->sort_mode,s->keys[c]) == VKEY_VAL(s->sort_mode, key))
 			return c;
-		else if (s->keys[c] < key)
+		else if (VKEY_VAL(s->sort_mode, s->keys[c]) < VKEY_VAL(s->sort_mode, key))
 			a = c+1;
 		else
 			b = c;
@@ -155,7 +159,7 @@ boolean vset_contains(struct vset * s, void * key)
 	if (!s->count)
 		return false;
 	p = vset_get_pos(s, key);
-	return p < s->count && s->keys[p] == key;
+	return p < s->count && VKEY_VAL(s->sort_mode, s->keys[p]) == VKEY_VAL(s->sort_mode, key);
 }
 
 boolean vset_containsvec(struct vset * s, struct vvec * v)
@@ -214,7 +218,7 @@ boolean vset_add(struct vset * s, void * key)
 {
 	int p = vset_get_pos(s, key);
 
-	if (p == s->count || s->keys[p] != key) {
+	if (p == s->count || VKEY_VAL(s->sort_mode, s->keys[p]) != VKEY_VAL(s->sort_mode, key)) {
 		s->count++;
 		vset_resize(s);
 		if (s->count > p+1)
@@ -236,7 +240,7 @@ boolean vset_remove(struct vset * s, void * key)
 	if (p == s->count)
 		return false;
 
-	if (s->keys[p] == key) {
+	if (VKEY_VAL(s->sort_mode, s->keys[p]) == VKEY_VAL(s->sort_mode, key)) {
 		if (s->count > p+1)
 			memmove(&s->keys[p], &s->keys[p+1], (s->count-1-p)*sizeof(void *));
 		s->count--;
@@ -252,8 +256,8 @@ void vset_addset(struct vset * s, struct vset * from)
 	int need_insert = 1;
 
 	while (p2 < from->count && p1 < s->count ) {
-		k1 = (uintptr_t)s->keys[p1];
-		k2 = (uintptr_t)from->keys[p2];
+		k1 = VKEY_VAL(s->sort_mode, s->keys[p1]);
+		k2 = VKEY_VAL(s->sort_mode, from->keys[p2]);
 
 		if (k1<k2)
 			p1++;
@@ -277,18 +281,18 @@ void vset_addset(struct vset * s, struct vset * from)
 			memcpy(nkeys, s->keys, p * sizeof(void*));
 
 		while (p2 < from->count && p1 < s->count) {
-			k1 = (uintptr_t)s->keys[p1];
-			k2 = (uintptr_t)from->keys[p2];
+			k1 = VKEY_VAL(s->sort_mode, s->keys[p1]);
+			k2 = VKEY_VAL(s->sort_mode, from->keys[p2]);
 
 			if (k1<k2) {
-				nkeys[p] = (void*)k1;
+				nkeys[p] = s->keys[p1];
 				p1++;
 			} else if (k1 == k2) {
-				nkeys[p] = (void*)k1;
+				nkeys[p] = s->keys[p1];
 				p1++;
 				p2++;
 			} else if (k1>k2) {
-				nkeys[p] = (void*)k2;
+				nkeys[p] = from->keys[p2];
 				p2++;
 			}
 
@@ -337,7 +341,7 @@ boolean vset_removevec(struct vset * s, struct vvec * from)
 	boolean result = false;
 
 	for (q=0; q<from->count; q++)
-		if (from->keys[q]!=NULL)
+		if (from->keys[q] != NULL)
 			result |= vset_remove(s,from->keys[q]);
 
 	return result;
@@ -363,7 +367,7 @@ void vset_copy(struct vset * s, struct vset * from)
 
 struct vset * vset_createcopy(struct vset * from)
 {
-	struct vset *s = vset_create(from->count);
+	struct vset *s = vset_create(from->count, from->sort_mode);
 	vset_copy(s, from);
 	return s;
 }

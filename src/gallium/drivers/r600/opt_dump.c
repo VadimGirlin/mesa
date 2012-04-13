@@ -195,9 +195,10 @@ static void fprint_alu_src(FILE * f, struct r600_bytecode_alu_src * src)
 	if (sel<BC_NUM_REGISTERS)
 		fprintf(f, "R%u", sel);
 	else if (sel<BC_KCACHE_OFFSET) {
-		if (sel >= V_SQ_ALU_SRC_PARAM_BASE)
+		if (sel >= V_SQ_ALU_SRC_PARAM_BASE) {
 			fprintf(f, "Param%u", sel-V_SQ_ALU_SRC_PARAM_BASE);
-		else {
+			prchan = false;
+		} else {
 			switch (sel) {
 			case V_SQ_ALU_SRC_0:
 				fprintf(f,"0");
@@ -232,8 +233,11 @@ static void fprint_alu_src(FILE * f, struct r600_bytecode_alu_src * src)
 				fprintf(f,"special_val_%u",sel-BC_INLINE_OFFSET);
 			}
 		}
-	} else {
+	} else if (sel<BC_KCACHE_FINAL_OFFSET) {
 		sel -= BC_KCACHE_OFFSET;
+		fprintf(f, "C[%u]", sel);
+	} else {
+		sel -= BC_KCACHE_FINAL_OFFSET;
 		if (sel<160)
 			fprintf(f, "KC0[%u]", sel-128);
 		else if (sel<192)
@@ -320,7 +324,7 @@ void dump_tex(struct shader_info * info, int level, struct r600_bytecode_tex * t
 {
 	indent(level);
 	if (eg_tex_inst_names[tex->inst])
-		fprintf(stderr,"\t\t%s\t ",eg_tex_inst_names[tex->inst]);
+		fprintf(stderr,"\t\t%s  \t ",eg_tex_inst_names[tex->inst]);
 	else
 		fprintf(stderr,"\t\t(tex_inst_0x%X)\t ", tex->inst);
 
@@ -485,7 +489,7 @@ void dump_cf(struct shader_info * info, int level, struct r600_bytecode_cf * cf)
 		id++;
 		indent(level);
 
-		fprintf(stderr,"\t\t %s\t ", eg_cf_inst_names[EG_G_SQ_CF_ALLOC_EXPORT_WORD1_CF_INST(cf->output.inst)]);
+		fprintf(stderr,"\t\t %s  \t ", eg_cf_inst_names[EG_G_SQ_CF_ALLOC_EXPORT_WORD1_CF_INST(cf->output.inst)]);
 
 		if (exp_inst) {
 			switch (cf->output.type) {
@@ -622,6 +626,10 @@ void fprint_var(FILE *f, struct var_desc * v)
 {
 	boolean pr_chan = true;
 
+
+	if (v && (v->flags & VF_ABSOLUTELY_DEAD))
+		fprintf(f,"@#$_");
+
 	if (v && (v->flags & VF_DEAD))
 		fprintf(f,"{");
 
@@ -629,8 +637,8 @@ void fprint_var(FILE *f, struct var_desc * v)
 		fprintf(f," __ ");
 
 		return;
-	} else if (v->flags & VF_TEMP) {
-		fprintf(f, "v%d", v->reg.reg);
+	} else if (v->reg.reg & REG_TEMP) {
+		fprintf(f, "v%d", v->reg.reg & ~REG_TEMP);
 		pr_chan=false;
 
 	} else if (v->reg.reg & REG_SPECIAL) {
@@ -742,13 +750,6 @@ void dump_node(struct shader_info * info, struct ast_node * node, int level)
 	if (!check_dump_level(R600_OPT_DUMP_LEVEL_DEBUG))
 		return;
 
-	if (node->p_split)
-	{
-		indent(level);
-		R600_DUMP("p_split:\n");
-		dump_node(info, node->p_split, level);
-	}
-
 	switch (node->type) {
 	case NT_REGION:
 		indent(level);
@@ -803,9 +804,6 @@ void dump_node(struct shader_info * info, struct ast_node * node, int level)
 	if (node->subtype == NST_COPY) {
 		R600_DUMP(" COPY ");
 	}
-	if (node->subtype == NST_PCOPY) {
-		R600_DUMP(" PARALLEL_COPY ");
-	}
 
 	if (node->slot>0) {
 		R600_DUMP("  SLOT: %u  ", node->slot);
@@ -823,8 +821,8 @@ void dump_node(struct shader_info * info, struct ast_node * node, int level)
 		R600_DUMP(" 4S ");
 	}
 
-	if (node->flags & AF_ALU_DELETE)
-		R600_DUMP("  ALU_DELETE ");
+	if (node->flags & AF_SPLIT_COPY)
+		R600_DUMP("  AF_SPLIT_COPY ");
 
 
 	if (node->flags & AF_ALU_CLAMP_DST)
@@ -907,13 +905,6 @@ void dump_node(struct shader_info * info, struct ast_node * node, int level)
 		indent(level);
 		R600_DUMP("phi:\n");
 		dump_node(info, node->phi, level);
-	}
-
-	if (node->p_split_outs)
-	{
-		indent(level);
-		R600_DUMP("p_split_outs:\n");
-		dump_node(info, node->p_split_outs, level);
 	}
 
 	return;
@@ -1155,11 +1146,11 @@ void dump_bytecode(struct shader_info * info)
 
 			id++;
 			if (alu->last) {
-				for (i = 0; i < nliteral; i++, id++) {
+/*				for (i = 0; i < nliteral; i++, id++) {
 					float *f = (float*)(bc->bytecode + id);
 					fprintf(stderr, "\t\t\t\t   %04d %08X\t%f\n", id, bc->bytecode[id], *f);
 				}
-				id += nliteral & 1;
+*/				id += nliteral & 1;
 				nliteral = 0;
 
 				new_alu_group=1;

@@ -35,10 +35,7 @@ static boolean value_equal_cb(struct var_desc * v1, struct var_desc * v2)
 {
 	assert(v1 != NULL && v2 != NULL);
 
-	if (!(v1==v2 || v1->value_hint == v2 || v1 == v2->value_hint || (v1->value_hint == v2->value_hint && v1->value_hint!=NULL)))
-		return false;
-
-	return true;
+	return (v1==v2 || v1->value_hint == v2 || v1 == v2->value_hint || (v1->value_hint == v2->value_hint && v1->value_hint!=NULL));
 }
 
 static boolean value_equal(struct var_desc * v1, struct var_desc * v2)
@@ -59,13 +56,13 @@ static boolean interference(struct var_desc * v1, struct var_desc * v2)
 	boolean result = !value_equal_cb(v1, v2) &&
 			(v1->interferences && vset_contains(v1->interferences,v2));
 
-	if (result) {
+/*	if (result) {
 		R600_DUMP("intf_cb: ");
 		print_var(v1);
 		print_var(v2);
 		R600_DUMP("\n");
 	}
-
+*/
 	return result;
 }
 
@@ -83,7 +80,7 @@ static int vec_vars_count(struct vvec * vv)
 static void add_var_edge(struct var_desc * v, struct affinity_edge * e)
 {
 	if (!v->aff_edges)
-		v->aff_edges = vset_create(1);
+		v->aff_edges = vset_create(1, 0);
 
 	vset_add(v->aff_edges, e);
 }
@@ -119,7 +116,7 @@ void add_affinity_edge(struct shader_info * info, struct var_desc * v1, struct v
 	add_var_edge(v2, e);
 }
 
-static void build_a_edges_phi_copy(struct shader_info * info, struct ast_node * node, boolean alu_split)
+static void build_aff_edges_for_node(struct shader_info * info, struct ast_node * node)
 {
 	boolean phi = (node->subtype == NST_PHI);
 	int q;
@@ -137,18 +134,16 @@ static void build_a_edges_phi_copy(struct shader_info * info, struct ast_node * 
 
 			if (phi)
 				add_affinity_edge(info, v, node->outs->keys[0], AE_PHI_COST);
-			else if (alu_split)
-				add_affinity_edge(info, v, node->outs->keys[q], AE_CSPLIT_COST);
-			else
+			else if (node->flags & AF_SPLIT_COPY)
 				add_affinity_edge(info, v, node->outs->keys[q], AE_SPLIT_COST);
+			else
+				add_affinity_edge(info, v, node->outs->keys[q], AE_COPY_COST);
 		}
 	}
 }
 
 static void build_affinity_edges(struct shader_info * info, struct ast_node * node)
 {
-	boolean alu_gr = node->subtype == NST_ALU_GROUP;
-
 	if (node->flags & AF_DEAD)
 		return;
 
@@ -164,14 +159,11 @@ static void build_affinity_edges(struct shader_info * info, struct ast_node * no
 	if (node->loop_phi)
 		build_affinity_edges(info, node->loop_phi);
 
-	if (node->p_split)
-		build_a_edges_phi_copy(info, node->p_split, alu_gr);
-
-	if (node->p_split_outs)
-		build_a_edges_phi_copy(info, node->p_split_outs, alu_gr);
+	if (node->subtype == NST_COPY)
+		build_aff_edges_for_node(info, node);
 
 	if (node->subtype == NST_PHI)
-		build_a_edges_phi_copy(info, node, false);
+		build_aff_edges_for_node(info, node);
 
 }
 static boolean chunks_vars_interference(struct affinity_chunk * c1, struct affinity_chunk * c2)
@@ -190,155 +182,119 @@ static boolean chunks_vars_interference(struct affinity_chunk * c1, struct affin
 	return false;
 }
 
-/* checks if two chunk groups are compatible (that is, can be unified and coalesced) */
-static boolean chunk_sets_mappable(struct vset * s1, struct vset * s2, int ncomp)
-{
-	int q, w;
-	int max_v = 0;
-	int max_mask = 0;
-	int max_q = -1;
-
-	assert (s1->count <= ncomp && s2->count <= ncomp);
-
-	if (s1->count + s2->count <= ncomp)
-		return true;
-
-	if (s1->count > s2->count) {
-		struct vset *t = s1;
-		s1 = s2;
-		s2 = t;
-	}
-
-	for (q=0; q<s1->count; q++) {
-		struct affinity_chunk * c = s1->keys[q];
-
-		if (vset_contains(s2, c)) {
-			vset_remove(s1, c);
-			vset_remove(s2, c);
-			q--;
-			ncomp--;
-		}
-	}
-
-	if (s1->count == 0)
-		return true;
-
-	for (q=0; q<s1->count; q++) {
-		struct affinity_chunk * c = s1->keys[q];
-
-		int mv=0;
-		int mask = 0;
-
-		for (w=0; w<s2->count; w++) {
-			struct affinity_chunk * c2 = s2->keys[w];
-			if (chunks_vars_interference(c,c2)) {
-				mask |= 1<<w;
-				mv++;
-			}
-		}
-
-		if (mv == 0) {
-			vset_remove(s1, c);
-			q--;
-		} else if (mv == s2->count) {
-			if (ncomp > s2->count) {
-				vset_remove(s1, c);
-				q--;
-				ncomp--;
-			} else
-				return false;
-		} else if (mv > max_v) {
-			max_v = mv;
-			max_mask = mask;
-			max_q = q;
-		}
-	}
-
-	if (max_v) {
-		struct affinity_chunk * c = s1->keys[max_q];
-
-		for (q=0; q<s2->count; q++) {
-			if (!(max_mask & (1<<q))) {
-				struct affinity_chunk * c2 = s2->keys[q];
-				struct vset * sn1, * sn2;
-				boolean r;
-
-				/* assume that we've mapped c <-> c2, check remaining recursively
-				 */
-
-				if (s1->count + s2->count -1 <= ncomp)
-					return true;
-
-				/* FIXME: inefficient, but this path is expected to be hit really very rarely
-				 */
-
-				sn1 = vset_createcopy(s1);
-				sn2 = vset_createcopy(s2);
-				vset_remove(sn1, c);
-				vset_remove(sn2, c2);
-
-				r = chunk_sets_mappable(sn1,sn2, ncomp-1);
-
-				vset_destroy(sn1);
-				vset_destroy(sn2);
-
-				if (r)
-					return true;
-			}
-		}
-	}
-	return true;
-}
-
-static boolean constraints_compatible(struct var_desc * v1, struct var_desc * v2)
-{
-	int q;
-	struct vset * s1 = vset_create(4);
-	struct vset * s2 = vset_create(4);
-	boolean result = false;
-
-	for (q=0; q<v1->constraint->comps->count; q++) {
-		struct var_desc * v = v1->constraint->comps->keys[q];
-		if (v && v->chunk && v->chunk != v1->chunk)
-			vset_add(s1, v->chunk);
-	}
-
-	for (q=0; q<v2->constraint->comps->count; q++) {
-		struct var_desc * v = v2->constraint->comps->keys[q];
-		if (v && v->chunk && v->chunk != v2->chunk)
-			vset_add(s2, v->chunk);
-	}
-
-	result = chunk_sets_mappable(s1,s2,3);
-
-	vset_destroy(s1);
-	vset_destroy(s2);
-	return result;
-}
 
 static boolean chunks_interference(struct shader_info * info, struct affinity_chunk * c1, struct affinity_chunk * c2)
 {
 	int q, w;
 
+	struct vset * constraints = vset_create(4, 0);
+	struct vset * cchunks = vset_create(4, 0);
+	struct vset * live_chunks = vset_create(4, 0);
+	struct vset * live_values = vset_create(4, 0);
+	struct var_desc *v;
+
+	boolean result = true;
+
 	assert (c1!=c2);
 
-	if (chunks_vars_interference(c1, c2))
-		return true;
+	R600_DUMP("chunks_interference: ");
+	dump_chunk(c1);
+	R600_DUMP("                and: ");
+	dump_chunk(c2);
+
+	if (chunks_vars_interference(c1, c2)) {
+//		R600_DUMP("vars intf ");
+		goto out;
+	}
+
+
 
 	for (q=0; q<c1->vars->count; q++) {
-		struct var_desc *v1 = c1->vars->keys[q];
+		v = c1->vars->keys[q];
 
-		if (v1->constraint) {
-			for (w=0; w<c2->vars->count; w++) {
-				struct var_desc  *v2 = c2->vars->keys[w];
-				if (v2->constraint)
-					if (!constraints_compatible(v1,v2))
-						return true;
-			}
+		if (v->flags & (VF_DEAD|VF_SPECIAL))
+			continue;
+
+		if (v->constraint)
+			vset_add(constraints, v->constraint);
+	}
+	for (q=0; q<c2->vars->count; q++) {
+		v = c2->vars->keys[q];
+
+		if (v->flags & (VF_DEAD|VF_SPECIAL))
+			continue;
+
+		if (v->constraint)
+			vset_add(constraints, v->constraint);
+	}
+
+	for (q=0; q<constraints->count; q++) {
+		struct rc_constraint * c = (struct rc_constraint *)constraints->keys[q];
+
+		for (w=0; w<c->comps->count; w++) {
+			v = c->comps->keys[w];
+
+			if (v->flags & (VF_DEAD|VF_SPECIAL))
+				continue;
+
+			if (v && v->chunk)
+				vset_add(cchunks, v->chunk);
 		}
 	}
 
-	return false;
+	for (q=0; q<constraints->count; q++) {
+		struct rc_constraint * c = (struct rc_constraint *)constraints->keys[q];
+		struct vset * live = c->in ? c->node->vars_live : c->node->vars_live_after;
+
+		for (w = 0; w<live->count; w++) {
+			struct var_desc * lv =  live->keys[w];
+			struct affinity_chunk * ch = lv->chunk;
+			if (vset_contains(cchunks, ch)) {
+				struct var_desc * v = ch->vars->keys[0];
+				if (v->value_hint)
+					v=v->value_hint;
+
+				/* FIXME: probably also check channel allocation */
+				if (!vset_contains(live_values, v)) {
+					vset_add(live_chunks, ch);
+
+					if (live_chunks->count > 4)
+						goto out;
+
+					vset_add(live_values, v);
+				}
+			}
+		}
+
+		boolean chan_used[4] = {};
+
+		for (w = 0; w<live_chunks->count; w++) {
+			struct affinity_chunk * ch = live_chunks->keys[w];
+
+			if (ch->pin_chan)
+				if (chan_used[ch->pin_chan-1]) {
+//					R600_DUMP("chan used ");
+					goto out;
+				}
+				else
+					chan_used[ch->pin_chan-1] = true;
+		}
+
+		vset_clear(live_chunks);
+		vset_clear(live_values);
+	}
+
+	result = false;
+
+out:
+
+	vset_destroy(constraints);
+	vset_destroy(cchunks);
+	vset_destroy(live_chunks);
+
+//	R600_DUMP(result?"TRUE\n":"FALSE\n");
+
+	return result;
 }
 
 static struct affinity_chunk * create_chunk()
@@ -355,9 +311,16 @@ static struct affinity_chunk * create_var_chunk(struct var_desc *v)
 	assert(v);
 
 	c->cost = 0;
-	c->vars = vset_create(1);
+	c->vars = vset_create(1, 1);
 	vset_add(c->vars, v);
 
+	/*
+	if (v->flags & VF_PIN_CHAN)
+		c->pin_chan = v->reg.chan+1;
+
+	if (v->flags & VF_PIN_REG)
+		c->pin_reg = v->reg.reg+1;
+*/
 	return c;
 }
 
@@ -370,20 +333,29 @@ static void delete_chunk(struct affinity_chunk * c)
 static void unify_chunks(struct shader_info * info, struct affinity_edge * e)
 {
 	int q;
-	struct affinity_chunk * c = e->v2->chunk;
+	struct affinity_chunk *c1 = e->v->chunk, * c2 = e->v2->chunk;
+/*
+	R600_DUMP("unify_chunks: ");
+	print_var(e->v);
+	print_var(e->v2);
+	R600_DUMP("\n");
+*/
+	if (c1 != c2) {
 
-	if (c!=e->v->chunk) {
+		/* only one of the is not zero */
+		c1->pin_reg += c2->pin_reg;
+		c1->pin_chan += c2->pin_chan;
 
-		for (q=0; q<c->vars->count; q++) {
-			struct var_desc * v =  c->vars->keys[q];
-			v->chunk = e->v->chunk;
+		for (q=0; q<c2->vars->count; q++) {
+			struct var_desc * v =  c2->vars->keys[q];
+			v->chunk = c1;
 		}
 
-		vset_addset(e->v->chunk->vars, c->vars);
-		e->v->chunk->cost += c->cost + e->cost;
-		delete_chunk(c);
+		vset_addset(c1->vars, c2->vars);
+		c1->cost += c2->cost + e->cost;
+		delete_chunk(c2);
 	} else
-		c->cost += e->cost;
+		c1->cost += e->cost;
 }
 
 static void build_chunks(struct shader_info * info)
@@ -402,10 +374,13 @@ static void build_chunks(struct shader_info * info)
 
 	for (q=info->edge_queue->count-1; q>=0; q--) {
 		struct affinity_edge * e = info->edge_queue->keys[2*q+1];
+		struct affinity_chunk *c1 = e->v->chunk, *c2 = e->v2->chunk;
 
-		if (e->v->chunk == e->v2->chunk)
-			e->v->chunk->cost += e->cost;
-		else if (!chunks_interference(info, e->v->chunk, e->v2->chunk))
+		if (c1 == c2)
+			c1->cost += e->cost;
+		else if (!(c1->pin_reg && c2->pin_reg && c1->pin_reg != c2->pin_reg) &&
+				!(c1->pin_chan && c2->pin_chan && c1->pin_chan != c2->pin_chan) &&
+				!chunks_interference(info, c1, c2))
 			unify_chunks(info, e);
 	}
 }
@@ -413,8 +388,8 @@ static void build_chunks(struct shader_info * info)
 static void build_chunks_queue(struct shader_info * info)
 {
 	int q;
-	struct vset * chunks = vset_create(16);
-	struct vset * group = vset_create(4);
+	struct vset * chunks = vset_create(16, 0);
+	struct vset * group = vset_create(4, 0);
 
 	info->chunk_queue = vque_create(chunks->count);
 
@@ -640,7 +615,7 @@ static int choose_color_constrained(struct shader_info * info, struct var_desc *
 
 		used = false;
 
-		for (w = 0; w<4; w++) {
+		for (w = 0; w<rc->comps->count; w++) {
 			struct var_desc * c = rc->comps->keys[w];
 
 			if (c!=NULL && c->fixed && c->color==color && !value_equal(c,v)) {
@@ -758,7 +733,7 @@ static boolean avoid_color(struct shader_info * info, struct var_desc * v, int c
 
 static boolean recolor_var(struct shader_info * info, struct var_desc * v, int color, boolean dump)
 {
-	struct vset * recolored = vset_create(1);
+	struct vset * recolored = vset_create(1, 1);
 	boolean result = true;
 	int q;
 
@@ -886,9 +861,9 @@ static void get_affine_subset(struct shader_info * info, struct vset * colored, 
 
 	struct vset * new_vars, * new_vars2, * edges, *tmp;
 
-	new_vars = vset_create(1);
-	new_vars2 = vset_create(1);
-	edges = vset_create(1);
+	new_vars = vset_create(1, 1);
+	new_vars2 = vset_create(1, 1);
+	edges = vset_create(1, 0);
 
 	vset_clear(cset);
 
@@ -940,7 +915,7 @@ static void get_affine_subset(struct shader_info * info, struct vset * colored, 
 static void get_best_affine_subset(struct shader_info * info, struct vset * colored, struct vset * clr_best, int * cur_cost)
 {
 	int best_cost = -1, cost;
-	struct vset * cset = vset_create(1);
+	struct vset * cset = vset_create(1, 1);
 
 	vset_clear(clr_best);
 
@@ -1034,8 +1009,8 @@ static void rcg_color_chunk(struct rcg_ctx * x, int chunk_index, boolean final)
 	struct shader_info * info = x->info;
 	struct var_desc * v;
 	int q, cur_cost=-1;
-	struct vset * colored = vset_create(chunk->vars->count);
-	struct vset * clr_best = vset_create(1);
+	struct vset * colored = vset_create(chunk->vars->count, 1);
+	struct vset * clr_best = vset_create(1, 1);
 	int color = REGCHAN_KEY(x->base_reg, x->new_chan[chunk_index]);
 
 #ifdef CLR_DUMP
@@ -1245,9 +1220,6 @@ static void color_node(struct shader_info * info, struct ast_node * node)
 	if (node->loop_phi)
 		color_node(info, node->loop_phi);
 
-	if (node->p_split)
-		color_node(info, node->p_split);
-
 	if (node->outs) {
 		int q;
 
@@ -1261,9 +1233,6 @@ static void color_node(struct shader_info * info, struct ast_node * node)
 			}
 		}
 	}
-
-	if (node->p_split_outs)
-		color_node(info, node->p_split_outs);
 
 	if (node->child)
 		color_node(info, node->child);
@@ -1306,7 +1275,7 @@ boolean recolor_local(struct shader_info * info, struct var_desc * v)
 		return true;
 	}
 
-	colors = vset_create(16);
+	colors = vset_create(16, 0);
 
 	color += KEY_CHAN(v->color);
 	color_step = 4;

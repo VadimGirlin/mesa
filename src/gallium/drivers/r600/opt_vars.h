@@ -28,8 +28,13 @@ struct shader_info;
 
 #define REGCHAN_KEY_MAX (123<<2)
 
-#define REG_SPECIAL (1<<20)
-#define REG_TEMP (1<<30)
+/* max reg bit is 29 (we are shifting by 2 to the left to get the key) */
+#define REG_SPECIAL (1<<29)
+#define REG_TEMP (1<<28)
+
+/* key is 32 bit for now, 2 bits for flags, 2 for chan, 14 for index, 14 for reg */
+#define VKEY_MAX_REG ((1<<14)-1)
+#define VKEY_MAX_INDEX ((1<<14)-1)
 
 /* pseudoregisters: */
 /* active mask */
@@ -91,7 +96,6 @@ enum node_subtype
 
 	NST_PARALLEL_GROUP,
 	NST_COPY,
-	NST_PCOPY,
 
 	NST_ALU_CLAUSE,
 	NST_ALU_GROUP,
@@ -143,9 +147,10 @@ enum var_flags
 	/* variable is dead (not used) */
 	VF_DEAD = (1<<8),
 
+	VF_ABSOLUTELY_DEAD = (1<<9),
+
 	/* temporary variable created during optimization,
 	 * as opposed to variable corresponding to gpr from original shader code */
-	VF_TEMP = (1<<9),
 
 	VF_UNDEFINED = (1<<10)
 
@@ -156,6 +161,7 @@ enum var_flags
  * 		all constrained variables should be allocated
  * 		to the components of the same gpr (e.g. inputs for EXPORT, SAMPLE, etc)
  *
+ * FIXME: 2) not used anymore??
  * 2) bank swizzle constraint (var_desc.bs_constraint):
  * 		for all groups of (4-slots) instructions, we should avoid using more than 3
  * 		different input values (variables) allocated to the same channel,
@@ -166,11 +172,16 @@ struct rc_constraint
 	struct vvec * comps;
 	int fixed;
 	int r_color;
+
+	struct ast_node * node;
+	boolean in;
 };
 
 
 struct var_desc
 {
+	uintptr_t key;
+
 	struct reg_desc reg;
 
 	enum var_flags flags;
@@ -187,6 +198,7 @@ struct var_desc
 
 	/* constraints - see comments for struct rc_constraint above */
 	struct rc_constraint * constraint;
+
 	struct rc_constraint * bs_constraint;
 
 	/* set of interfering variables (i.e. which are live simultaneously with this variable) */
@@ -220,6 +232,8 @@ struct vset
 	void **keys;
 	unsigned count;
 	unsigned size;
+	/* sort_mode: 0 - compare by "key", 1 - by "*(uintptr_t*)key" */
+	unsigned sort_mode;
 };
 
 // map (sorted by key)
@@ -265,12 +279,17 @@ struct affinity_chunk
 	struct chunk_group * group;
 	int cost;
 	enum chunk_flags flags;
+
+	/* reg+1 if some var is pinned to reg */
+	unsigned pin_reg;
+	/* chan+1 if some var is pinned to chan */
+	unsigned pin_chan;
 };
 
 
-// priority queue (sorted by priority ascending),
-// dequeue gets last item (with max priority)
-
+/* priority queue (sorted by priority ascending),
+ * dequeue gets last item (with max priority)
+ */
 struct vque {
 	void **keys;
 	unsigned count;
@@ -287,8 +306,7 @@ boolean vvec_contains(struct vvec * s, void * key);
 struct vvec * vvec_createcopy(struct vvec * s);
 void vvec_clear(struct vvec * s);
 
-
-struct vset* vset_create(unsigned initial_size);
+struct vset* vset_create(unsigned initial_size, unsigned sort_mode);
 void vset_destroy(struct vset * s);
 int vset_get_pos(struct vset * s, void * key);
 boolean vset_contains(struct vset * s, void * key);

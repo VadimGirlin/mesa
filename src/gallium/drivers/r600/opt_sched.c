@@ -92,10 +92,10 @@ static struct ast_node * gs_create_list(struct shader_info * info, struct vque *
 	for (q=0; q<blocks->count; q++) {
 		struct ast_node * n = blocks->keys[q*2+1];
 		boolean alu = n->subtype == NST_ALU_INST || n->subtype == NST_ALU_GROUP || n->subtype == NST_COPY;
-
+/*
 		R600_DUMP("gs_create_list : ");
 		dump_node(info, n, 0);
-
+*/
 		if (alu) {
 			if (n->subtype == NST_ALU_INST || n->subtype == NST_COPY) {
 				boolean new_group = (n->min_prio!=last_alu_prio) || (nalu==info->max_slots-1);
@@ -173,18 +173,18 @@ static void gs_schedule_node(struct shader_info * info, struct ast_node * node)
 
 	gs_enqueue_blocks(info, blocks, node->child);
 
-	R600_DUMP("\n##QUEUED BLOCKS:\n");
-
+/*	R600_DUMP("\n##QUEUED BLOCKS:\n");
+*/
 	for (q=blocks->count-1; q>=0; q--) {
 		struct ast_node * n = blocks->keys[q*2+1];
-		dump_node(info, n, 0);
-
+/*		dump_node(info, n, 0);
+*/
 		if (n->child && (n->type == NT_REGION || n->type == NT_REPEAT || n->type == NT_DEPART || n->type==NT_IF))
 			gs_schedule_node(info, n);
 	}
 
-	R600_DUMP("##QUEUED BLOCKS END\n\n");
-
+/*	R600_DUMP("##QUEUED BLOCKS END\n\n");
+*/
 	list = gs_create_list(info, blocks);
 
 	vque_destroy(blocks);
@@ -195,10 +195,61 @@ static void gs_schedule_node(struct shader_info * info, struct ast_node * node)
 		list->parent = node;
 }
 
+/* create ins and outs vectors for the alu instructions group */
+static void create_group_iovecs(struct ast_node * g)
+{
+	struct ast_node *l = g->child;
+	int ic = 0, oc = 0;
+
+	assert (g->subtype == NST_ALU_GROUP);
+
+	if (g->ins)
+		return;
+
+	if (g->ins == NULL)
+		g->ins = vvec_create(5*3);
+	else
+		vvec_clear(g->ins);
+
+	if (g->outs == NULL)
+		g->outs = vvec_create(5*3);
+	else
+		vvec_clear(g->outs);
+
+	while (l && l->child) {
+		struct ast_node * n = l->child;
+		int q;
+
+		for (q=0; q<n->outs->count; q++)
+			g->outs->keys[oc++] = n->outs->keys[q];
+
+		for (q=0; q<n->ins->count; q++)
+			g->ins->keys[ic++] = n->ins->keys[q];
+
+		l = l->rest;
+	}
+
+	assert(ic <= g->ins->count);
+	assert(oc <= g->outs->count);
+
+	while(ic<g->ins->count)
+		g->ins->keys[ic++] = NULL;
+
+	while(oc<g->outs->count)
+		g->outs->keys[oc++] = NULL;
+}
+
+
+
+
 /* collect the sets of used vars for every block (region) */
 static void gs_collect_vars_usage(struct ast_node * node)
 {
-	node->vars_used = vset_create(1);
+	node->vars_used = vset_create(1, 1);
+
+	if (node->subtype == NST_ALU_GROUP) {
+		create_group_iovecs(node);
+	}
 
 	if (node->child) {
 		gs_collect_vars_usage(node->child);
@@ -209,9 +260,6 @@ static void gs_collect_vars_usage(struct ast_node * node)
 		gs_collect_vars_usage(node->rest);
 		vset_addset(node->vars_used, node->rest->vars_used);
 	}
-
-	if (node->p_split)
-		vset_addvec(node->vars_used, node->p_split->ins);
 
 	if (node->loop_phi) {
 		gs_collect_vars_usage(node->loop_phi);
@@ -243,7 +291,6 @@ static enum node_subtype gs_prio_get_node_subtype(struct ast_node * node)
 		return node->subtype;
 
 	case NST_COPY:
-	case NST_PCOPY:
 	case NST_ALU_GROUP:
 		return NST_ALU_INST;
 
@@ -258,11 +305,6 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 
 	if (node->flags & AF_DEAD)
 		return 0;
-
-	if (node->p_split_outs) {
-		int mcp = gs_calc_min_prio(info, node->p_split_outs);
-		max_child_prio = MAX2(max_child_prio, mcp);
-	}
 
 	if (node->phi) {
 		int mcp = gs_calc_min_prio(info, node->phi);
@@ -356,9 +398,6 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 		gs_calc_min_prio(info, node->loop_phi);
 	}
 
-	if (node->p_split)
-		gs_calc_min_prio(info, node->p_split);
-
 	if (node->vars_used
 			&& (node->type == NT_REGION	|| node->type == NT_IF || node->subtype == NST_ALU_GROUP)) {
 		int q;
@@ -391,9 +430,6 @@ static void gs_calc_max_prio(struct shader_info * info, struct ast_node * node)
 		boolean alu = (st == NST_ALU_INST);
 		boolean fetch = (st == NST_TEX_INST || st == NST_VTX_INST);
 		boolean fetch_dep = false;
-
-		if (node->p_split)
-			gs_calc_max_prio(info, node->p_split);
 
 		if (node->flow_dep) {
 			struct var_desc * v = node->flow_dep;
@@ -440,9 +476,6 @@ static void gs_calc_max_prio(struct shader_info * info, struct ast_node * node)
 				}
 			}
 		}
-
-		if (node->p_split_outs)
-			gs_calc_max_prio(info, node->p_split_outs);
 	}
 
 	if (node->child)
@@ -467,59 +500,6 @@ void gs_schedule(struct shader_info * info)
 	dump_shader_tree(info);
 
 	gs_schedule_node(info, info->root);
-}
-
-/* create ins and outs vectors for the alu instructions group */
-static void create_group_iovecs(struct ast_node * g)
-{
-	struct ast_node *l = g->child;
-	int ic = 0, oc = 0;
-
-	assert (g->subtype == NST_ALU_GROUP);
-
-	if (g->ins)
-		return;
-
-	if (g->p_split) {
-		assert(g->p_split_outs);
-
-		g->ins = vvec_createcopy(g->p_split->ins);
-		g->outs = vvec_createcopy(g->p_split_outs->outs);
-
-		return;
-	}
-
-	if (g->ins == NULL)
-		g->ins = vvec_create(5*3);
-	else
-		vvec_clear(g->ins);
-
-	if (g->outs == NULL)
-		g->outs = vvec_create(5*3);
-	else
-		vvec_clear(g->outs);
-
-	while (l && l->child) {
-		struct ast_node * n = l->child;
-		int q;
-
-		for (q=0; q<n->outs->count; q++)
-			g->outs->keys[oc++] = n->outs->keys[q];
-
-		for (q=0; q<n->ins->count; q++)
-			g->ins->keys[ic++] = n->ins->keys[q];
-
-		l = l->rest;
-	}
-
-	assert(ic <= g->ins->count);
-	assert(oc <= g->outs->count);
-
-	while(ic<g->ins->count)
-		g->ins->keys[ic++] = NULL;
-
-	while(oc<g->outs->count)
-		g->outs->keys[oc++] = NULL;
 }
 
 /* updating use counts map for variables */
@@ -925,7 +905,7 @@ static boolean sched_cbs_add_slot(struct scheduler_ctx * ctx, int curgroup, int 
 static void sched_check_chunks_types(struct vset * vars, struct vset * globals)
 {
 	int q;
-	struct vset * processed_chunks = vset_create(16);
+	struct vset * processed_chunks = vset_create(16, 0);
 
 	for (q=0; q<vars->count; q++) {
 		struct var_desc * v = vars->keys[q];
@@ -984,7 +964,7 @@ static void sched_select_live_instructions(struct scheduler_ctx * ctx)
 	if (clause_node->vars_defined)
 		vset_clear(clause_node->vars_defined);
 	else
-		clause_node->vars_defined = vset_create(16);
+		clause_node->vars_defined = vset_create(16, 1);
 
 	/* select non-dead instructions for scheduling */
 	while (c) {
@@ -994,17 +974,10 @@ static void sched_select_live_instructions(struct scheduler_ctx * ctx)
 				continue;
 			}
 
-			if (c->child->type == NT_GROUP) {
+/*			if (c->child->type == NT_GROUP) {
 				create_group_iovecs(c->child);
-
-				if (c->child->p_split)
-					vset_addvec(clause_node->vars_defined, c->child->p_split->outs);
-				if (c->child->p_split_outs) {
-					vset_addvec(clause_node->vars_defined, c->child->p_split_outs->outs);
-					vset_addvec(clause_node->vars_defined, c->child->p_split_outs->ins);
-				}
 			}
-
+*/
 			/* accumulate use count for every var */
 			update_counts(ctx->use_count, c->child->ins, +1);
 			/* add instruction to the list */
@@ -1089,38 +1062,41 @@ static void sched_select_ready_instructions(struct scheduler_ctx * ctx)
 			struct var_desc * i = n->ins->keys[0];
 			struct var_desc * o = n->outs->keys[0];
 
-			/* if output is not live, just skip for now */
-			if (!vset_contains(ctx->live, o))
-				continue;
+			if (i) {
 
-			if (i->color == o->color) {
-
-				if (!vset_removevec(ctx->live, n->outs))
+				/* if output is not live, just skip for now */
+				if (!vset_contains(ctx->live, o))
 					continue;
 
-				struct var_desc * v;
-				update_counts(ctx->use_count, n->ins, -1);
-				vset_addvec(ctx->live, n->ins);
+				if (i->color == o->color) {
 
-				R600_DUMP("copy coalesced @ ");
-				print_reg(i->color);
-				R600_DUMP(" : ");
-				print_var(o);
-				R600_DUMP(" <= ");
-				print_var(i);
-				R600_DUMP("\n");
+					if (!vset_removevec(ctx->live, n->outs))
+						continue;
 
-				if (VMAP_GET(ctx->reg_map,o->color, &v)) {
-					if (v==o || (v->chunk==o->chunk && v->chunk))
-						VMAP_SET(ctx->reg_map, i->color, i);
+					struct var_desc * v;
+					update_counts(ctx->use_count, n->ins, -1);
+					vset_addvec(ctx->live, n->ins);
+
+					R600_DUMP("copy coalesced @ ");
+					print_reg(i->color);
+					R600_DUMP(" : ");
+					print_var(o);
+					R600_DUMP(" <= ");
+					print_var(i);
+					R600_DUMP("\n");
+
+					if (VMAP_GET(ctx->reg_map,o->color, &v)) {
+						if (v==o || (v->chunk==o->chunk && v->chunk))
+							VMAP_SET(ctx->reg_map, i->color, i);
+					}
+
+					R600_DUMP("skipping coalesced copy: ");
+					dump_node(ctx->info, n, 0);
+					VMAP_REMOVE(ctx->instructions, index);
+					ctx->count--;
+
+					continue;
 				}
-
-				R600_DUMP("skipping coalesced copy: ");
-				dump_node(ctx->info, n, 0);
-				VMAP_REMOVE(ctx->instructions, index);
-				ctx->count--;
-
-				continue;
 			}
 		}
 
@@ -1519,7 +1495,7 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 	memset(&ctx, 0, sizeof(ctx));
 
 	ctx.info = info;
-	ctx.locals = vset_create(16);
+	ctx.locals = vset_create(16, 1);
 	ctx.globals = vset_createcopy(clause_node->vars_live);
 	ctx.instructions = vmap_create(64);
 	ctx.ready_inst = vmap_create(64);
@@ -1652,6 +1628,8 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 				}
 
 				slot = -1;
+
+				assert(n->alu_allowed_slots_type);
 
 				/* try vector slot first */
 				if ((slot==-1) && (n->alu_allowed_slots_type & AT_VECTOR)) {
