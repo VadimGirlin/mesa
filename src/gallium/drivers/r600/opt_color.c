@@ -314,13 +314,13 @@ static struct affinity_chunk * create_var_chunk(struct var_desc *v)
 	c->vars = vset_create(1, 1);
 	vset_add(c->vars, v);
 
-	/*
+
 	if (v->flags & VF_PIN_CHAN)
 		c->pin_chan = v->reg.chan+1;
 
 	if (v->flags & VF_PIN_REG)
 		c->pin_reg = v->reg.reg+1;
-*/
+
 	return c;
 }
 
@@ -342,9 +342,8 @@ static void unify_chunks(struct shader_info * info, struct affinity_edge * e)
 */
 	if (c1 != c2) {
 
-		/* only one of the is not zero */
-		c1->pin_reg += c2->pin_reg;
-		c1->pin_chan += c2->pin_chan;
+		c1->pin_reg = c1->pin_reg ? c1->pin_reg : c2->pin_reg;
+		c1->pin_chan = c1->pin_chan ? c1->pin_chan : c2->pin_chan;
 
 		for (q=0; q<c2->vars->count; q++) {
 			struct var_desc * v =  c2->vars->keys[q];
@@ -607,11 +606,20 @@ static int choose_color_constrained(struct shader_info * info, struct var_desc *
 	int q,w, color;
 	boolean used;
 
+	int pin_chan = v->chunk->pin_chan;
+
 	for (q = 0; q<4;q++) {
 		color = (rc->r_color-1)*4 + 1 + q;
 
 		if ((v->flags & VF_PIN_CHAN) && (KEY_CHAN(color) != v->reg.chan))
 			continue;
+
+		if (pin_chan && (KEY_CHAN(color) != pin_chan-1)) {
+#ifdef CLR_DUMP
+			R600_DUMP("skipping clr %d due to pin_chan %d\n ", color, pin_chan);
+#endif
+			continue;
+		}
 
 		used = false;
 
@@ -749,7 +757,7 @@ static boolean recolor_var(struct shader_info * info, struct var_desc * v, int c
 #ifdef CLR_DUMP
 			R600_DUMP("\t unable to recolor ");
 			print_var(v);
-			R600_DUMP(": chan constraint\n");
+			R600_DUMP("from %d to %d : chan constraint\n", v->color, color);
 #endif
 		}
 

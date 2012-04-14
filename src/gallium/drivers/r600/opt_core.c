@@ -3052,9 +3052,6 @@ static boolean create_shader_tree(struct shader_info * info)
 	reset_interferences(info);
 	liveness(info);
 
-	dump_shader_tree(info);
-	dump_var_table(info);
-
 	analyze_vars(info);
 
 	/* global scheduling (initial support - fetch combining etc) */
