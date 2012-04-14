@@ -245,13 +245,19 @@ static void create_group_iovecs(struct ast_node * g)
 	while(oc<g->outs->count)
 		g->outs->keys[oc++] = NULL;
 
-	struct rc_constraint * bs = calloc(1,sizeof(struct rc_constraint));
-	bs->comps = vvec_create(ins->count);
-	for (q=0; q<ins->count; q++) {
-		struct var_desc * v = ins->keys[q];
-		bs->comps->keys[q] = v;
-		v->bs_constraint = bs;
+	if (ins->count) {
+
+		struct rc_constraint * bs = calloc(1,sizeof(struct rc_constraint));
+		bs->comps = vvec_create(ins->count);
+		for (q=0; q<ins->count; q++) {
+			struct var_desc * v = ins->keys[q];
+			bs->comps->keys[q] = v;
+			v->bs_constraint = bs;
+		}
+
 	}
+
+	vset_destroy(ins);
 }
 
 

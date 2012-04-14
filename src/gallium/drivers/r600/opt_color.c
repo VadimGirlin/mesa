@@ -291,6 +291,7 @@ out:
 	vset_destroy(constraints);
 	vset_destroy(cchunks);
 	vset_destroy(live_chunks);
+	vset_destroy(live_values);
 
 //	R600_DUMP(result?"TRUE\n":"FALSE\n");
 
