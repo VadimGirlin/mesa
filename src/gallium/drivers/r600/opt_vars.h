@@ -26,7 +26,7 @@
 
 struct shader_info;
 
-#define REGCHAN_KEY_MAX (123<<2)
+#define REGCHAN_KEY_MAX (128<<2)
 
 /* max reg bit is 29 (we are shifting by 2 to the left to get the key) */
 #define REG_SPECIAL (1<<29)
@@ -152,8 +152,9 @@ enum var_flags
 	/* temporary variable created during optimization,
 	 * as opposed to variable corresponding to gpr from original shader code */
 
-	VF_UNDEFINED = (1<<10)
+	VF_UNDEFINED = (1<<10),
 
+	VF_NONTEMP = (1<<11)
 };
 
 /* following structure is used for two types of constraints :

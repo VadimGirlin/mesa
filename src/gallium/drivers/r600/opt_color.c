@@ -536,7 +536,7 @@ static int get_unique_color(struct shader_info * info, struct var_desc * v)
 {
 	int new_color;
 	int color_start=1, color_step=1;
-	int last_color = (128-info->temp_gprs)*4;
+	int last_color = (128-2*info->temp_gprs)*4;
 
 	if (v->flags & VF_PIN_CHAN) {
 		color_start += v->reg.chan;
@@ -1135,7 +1135,7 @@ static void recolor_chunk_group(struct shader_info * info, struct chunk_group * 
 	int q;
 	boolean completed = false;
 	struct rcg_ctx rctx = {};
-	int last_reg = MIN2(info->last_color/4+2, 127-info->temp_gprs);
+	int last_reg = MIN2(info->last_color/4+2, 127 - 2*info->temp_gprs);
 
 	assert(count<=4);
 
@@ -1275,9 +1275,10 @@ static void add_neighbour_colors(struct vset * colors, struct vset * vars, struc
 boolean recolor_local(struct shader_info * info, struct var_desc * v)
 {
 	boolean result = false;
-	int color = 1, color_step = 1;
+	int color, color_step = 1, color_chan, first_temp;
 	struct vset * colors;
 	int q;
+	boolean temps_processed = false;
 
 	if (v->flags & VF_DEAD) {
 		v->color = 0;
@@ -1285,9 +1286,6 @@ boolean recolor_local(struct shader_info * info, struct var_desc * v)
 	}
 
 	colors = vset_create(16, 0);
-
-	color += KEY_CHAN(v->color);
-	color_step = 4;
 
 	R600_DUMP("recoloring ");
 	print_var(v);
@@ -1312,16 +1310,45 @@ boolean recolor_local(struct shader_info * info, struct var_desc * v)
 
 	q=0;
 
-	do {
-		while (q<colors->count && (uintptr_t)colors->keys[q]<color) q++;
+	color_chan = KEY_CHAN(v->color);
 
-		if (q<colors->count && (uintptr_t)colors->keys[q] == color)
+	assert(color_chan>=0 && color_chan<4);
+
+	/* try temps first */
+	first_temp = (128-info->temp_gprs)*4 + 1;
+	color_step = 4;
+
+	if (v->flags & VF_NONTEMP) {
+		color = 1 + color_chan;
+		temps_processed = true;
+	} else {
+		color = first_temp + color_chan;
+	}
+
+	do {
+		while (q<colors->count && (uintptr_t)colors->keys[q]<color)
+			q++;
+
+		if (q<colors->count && (uintptr_t)colors->keys[q] == color) {
 			color+=color_step;
+			if (temps_processed && (color >= (128-2*info->temp_gprs)*4+1)) {
+				assert(0);
+				color = 0;
+				break;
+			}
+			if (color > REGCHAN_KEY_MAX) {
+				color = color_chan + 1;
+				q = 0;
+				temps_processed = true;
+			}
+		}
 		else {
 			result = true;
 			break;
 		}
 	} while (color<=REGCHAN_KEY_MAX);
+
+	assert(result);
 
 	if (result) {
 		assert(KEY_CHAN(v->color) == KEY_CHAN(color));

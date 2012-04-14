@@ -1253,7 +1253,7 @@ static void sched_set_split(struct scheduler_ctx * ctx)
 
 /* check instruction count, kcache, etc
  * set AF_ALU_CLAUSE_SPLIT to start new clause when needed */
-static void sched_check_clause_limits(struct scheduler_ctx * ctx)
+static boolean sched_check_clause_limits(struct scheduler_ctx * ctx)
 {
 	boolean split = false;
 	int literal_slot_count = ctx->nliteral ? ((ctx->nliteral+1)>>1) : 0;
@@ -1272,8 +1272,24 @@ static void sched_check_clause_limits(struct scheduler_ctx * ctx)
 		ctx->alu_slot_count = ctx->group_inst_count + literal_slot_count;
 		sched_alloc_kcache(ctx);
 	}
+
+	return split;
 }
 
+static void sched_count_instructions(struct scheduler_ctx * ctx)
+{
+	int j, max_slots = ctx->info->max_slots;
+	struct ast_node * c;
+
+	ctx->group_inst_count = 0;
+
+	for (j=0; j<max_slots; j++) {
+		c = ctx->slots[ctx->curgroup][j];
+		if (c)	{
+			ctx->group_inst_count++;
+		}
+	}
+}
 
 static void sched_process_selected_group(struct scheduler_ctx * ctx)
 {
@@ -1296,14 +1312,10 @@ static void sched_process_selected_group(struct scheduler_ctx * ctx)
 		vset_addvec(ctx->live, g->ins);
 	}
 
-	ctx->group_inst_count = 0;
-
 	/* process 1-slot instructions */
 	for (j=0; j<max_slots; j++) {
 		c = ctx->slots[ctx->curgroup][j];
 		if (c)	{
-
-			ctx->group_inst_count++;
 
 			if (c->alu->dst.write==0)
 				c->alu->dst.chan = j&3;
@@ -1499,6 +1511,27 @@ static boolean sched_check_interferences(struct scheduler_ctx * ctx)
 	return true;
 }
 
+/* set NONTEMP flag for the vars that shouldn't allocated to temp gprs */
+static void sched_mark_nontemp(struct vset * s)
+{
+	int q, w;
+
+	for (q=0; q<s->count; q++) {
+		struct var_desc * v = s->keys[q];
+
+		if (v->flags & VF_NONTEMP)
+			continue;
+
+		if (v->chunk) {
+			for (w=0; w<v->chunk->vars->count; w++) {
+				struct var_desc * v2 = v->chunk->vars->keys[w];
+					v2->flags |= VF_NONTEMP;
+			}
+		} else
+			v->flags |= VF_NONTEMP;
+	}
+}
+
 
 /* schedule alu clause */
 /* probably could be described as a bottom-up greedy cycle scheduler */
@@ -1532,6 +1565,8 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 	sched_map_live_outs(&ctx);
 	sched_select_live_instructions(&ctx);
 	sched_check_chunks_types(clause_node->vars_defined, ctx.globals);
+
+	sched_mark_nontemp(ctx.globals);
 
 	ctx.count = ctx.instructions->count;
 
@@ -1777,8 +1812,37 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 			}
 		}
 
+		sched_count_instructions(&ctx);
+
+		if (sched_check_clause_limits(&ctx)) {
+			int j;
+			struct ast_node * c;
+
+			/* disable temp gpr alloc for the vars
+			 * that are live between clauses */
+			sched_mark_nontemp(ctx.live);
+
+			for (j=0; j<max_slots; j++) {
+				struct var_desc * v;
+
+				c = ctx.slots[ctx.curgroup][j];
+				if (c) {
+					v = c->outs->keys[0];
+
+					/* if colored as temp gpr - need to recolor again,
+					 * to normal gpr */
+					if (v && (v->color > (128-info->temp_gprs)*4)) {
+						if (!recolor_local(info, v)) {
+							R600_DUMP("failed recoloring back from temp\n");
+							assert(0);
+							return false;
+						}
+					}
+				}
+			}
+		}
+
 		sched_process_selected_group(&ctx);
-		sched_check_clause_limits(&ctx);
 
 		R600_DUMP( " updating interferences :");
 		dump_vset(ctx.live);

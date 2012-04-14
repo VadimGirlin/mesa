@@ -2481,8 +2481,8 @@ static void build_cf_node(struct shader_info * info, struct ast_node * node)
 			info->last_export[out.type] = info->bc->cf_last;
 
 			out.array_base++;
-			if ((int)info->bc->ngpr <= gpr)
-				info->bc->ngpr = gpr+1;
+			if (gpr>=0)
+				r600_bytecode_count_gprs(info->bc, gpr, 0);
 		}
 	} else if (node->op_class == NOC_CF_STREAMOUT) {
 		int q, w, gpr, burst_count = node->ins->count >> 2;
@@ -2527,8 +2527,8 @@ static void build_cf_node(struct shader_info * info, struct ast_node * node)
 			r600_bytecode_add_output(info->bc,&out);
 
 			out.array_base++;
-			if ((int)info->bc->ngpr <= gpr)
-				info->bc->ngpr = gpr+1;
+			if (gpr>=0)
+				r600_bytecode_count_gprs(info->bc, gpr, 0);
 		}
 	} else if (node->cf->inst == EG_V_SQ_CF_WORD1_SQ_CF_INST_CALL_FS)
 			r600_bytecode_add_cfinst(info->bc,node->cf->inst);
@@ -3146,7 +3146,7 @@ int r600_shader_optimize(struct r600_context * rctx, struct r600_pipe_shader *pi
 	 *  	2 - inverted 1 (skip for all others)
 	 */
 	static int skip_mode = 0;
-	static int skip_num = 8;
+	static int skip_num = 5;
 	static int skip_cnt = 1;
 
 	if (skip_mode) {
