@@ -33,6 +33,19 @@
 #define NUM_OF_CYCLES 3
 #define NUM_OF_COMPONENTS 4
 
+void r600_bytecode_count_gprs(struct r600_bytecode *bc, unsigned gpr, unsigned is_alu)
+{
+	unsigned max_gpr = bc->opt_build ? 128 : BC_NUM_REGISTERS;
+	unsigned temp_gprs = 4;
+
+	assert(gpr<(max_gpr - (is_alu ? 0 : 2*temp_gprs)));
+
+	max_gpr -= 2*temp_gprs;
+
+	if ((gpr < max_gpr) && (gpr >= bc->ngpr))
+		bc->ngpr = gpr+1;
+}
+
 unsigned int r600_bytecode_get_num_operands(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
 	if(alu->is_op3)
@@ -1456,16 +1469,15 @@ int r600_bytecode_add_alu_type(struct r600_bytecode *bc, const struct r600_bytec
 	}
 	/* number of gpr == the last gpr used in any alu */
 	for (i = 0; i < 3; i++) {
-		if (nalu->src[i].sel >= bc->ngpr && nalu->src[i].sel < BC_NUM_REGISTERS) {
-			bc->ngpr = nalu->src[i].sel + 1;
+		if (nalu->src[i].sel < BC_NUM_REGISTERS) {
+			r600_bytecode_count_gprs(bc, nalu->src[i].sel, 1);
 		}
 		if (nalu->src[i].sel == V_SQ_ALU_SRC_LITERAL)
 			r600_bytecode_special_constants(nalu->src[i].value,
 				&nalu->src[i].sel, &nalu->src[i].neg);
 	}
-	if (nalu->dst.sel >= bc->ngpr) {
-		bc->ngpr = nalu->dst.sel + 1;
-	}
+
+	r600_bytecode_count_gprs(bc, nalu->dst.sel, 1);
 	LIST_ADDTAIL(&nalu->list, &bc->cf_last->alu);
 	/* each alu use 2 dwords */
 	bc->cf_last->ndw += 2;
@@ -1671,12 +1683,9 @@ int r600_bytecode_add_tex(struct r600_bytecode *bc, const struct r600_bytecode_t
 		}
 		bc->cf_last->inst = BC_INST(bc, V_SQ_CF_WORD1_SQ_CF_INST_TEX);
 	}
-	if (ntex->src_gpr >= bc->ngpr) {
-		bc->ngpr = ntex->src_gpr + 1;
-	}
-	if (ntex->dst_gpr >= bc->ngpr) {
-		bc->ngpr = ntex->dst_gpr + 1;
-	}
+	r600_bytecode_count_gprs(bc, ntex->src_gpr, 0);
+	r600_bytecode_count_gprs(bc, ntex->dst_gpr, 0);
+
 	LIST_ADDTAIL(&ntex->list, &bc->cf_last->tex);
 	/* each texture fetch use 4 dwords */
 	bc->cf_last->ndw += 4;
