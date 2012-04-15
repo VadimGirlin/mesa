@@ -353,6 +353,63 @@ void vset_clear(struct vset * s)
 	s->count=0;
 }
 
+/* for two src sets s1 and s2 builds two sets, r1 = s1-s2, r2 = s2-s1 */
+/* FIXME: ignores sort mode */
+/* FIXME: optimize */
+void vset_diff2(struct vset *s1, struct vset *s2, struct vset *r1, struct vset *r2)
+{
+	int q1 = 0, q2 = 0;
+
+	while (q1<s1->count && q2<s2->count) {
+		uintptr_t k1 = (uintptr_t)s1->keys[q1];
+		uintptr_t k2 = (uintptr_t)s2->keys[q2];
+
+		if (k1<k2) {
+			vset_add(r1, (void*)k1);
+			q1++;
+		} else if (k1>k2) {
+			vset_add(r2, (void*)k2);
+			q2++;
+		} else {
+			q1++;
+			q2++;
+		}
+	}
+
+	while (q1<s1->count) {
+		vset_add(r1, s1->keys[q1++]);
+	}
+
+	while (q2<s2->count) {
+		vset_add(r2, s2->keys[q2++]);
+	}
+}
+
+/* r1 = s1 - s2 */
+void vset_diff(struct vset *s1, struct vset *s2, struct vset *r1)
+{
+	int q1 = 0, q2 = 0;
+
+	while (q1<s1->count && q2<s2->count) {
+		uintptr_t k1 = (uintptr_t)s1->keys[q1];
+		uintptr_t k2 = (uintptr_t)s2->keys[q2];
+
+		if (k1<k2) {
+			vset_add(r1, (void*)k1);
+			q1++;
+		} else if (k1>k2) {
+			q2++;
+		} else {
+			q1++;
+			q2++;
+		}
+	}
+
+	while (q1<s1->count) {
+		vset_add(r1, s1->keys[q1++]);
+	}
+}
+
 void vset_copy(struct vset * s, struct vset * from)
 {
 	if (!from) {

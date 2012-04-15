@@ -154,7 +154,11 @@ enum var_flags
 
 	VF_UNDEFINED = (1<<10),
 
-	VF_NONTEMP = (1<<11)
+	/* disable allocation to temp gprs */
+	/* FIXME: use chunk flag instead? */
+	VF_NONTEMP = (1<<11),
+
+	VF_PVPS = (1<<12)
 };
 
 /* following structure is used for two types of constraints :
@@ -218,6 +222,8 @@ struct var_desc
 	boolean fetch_dep;
 
 	struct vset * aff_edges;
+
+	int pvps_chan;
 };
 
 
@@ -263,9 +269,11 @@ struct affinity_edge
 enum chunk_flags {
 
 	/* local chunk - all variables in the chunk are local for some alu clause */
-	ACF_LOCAL = 1,
+	ACF_LOCAL = (1<<0),
 
-	ACF_GLOBAL = 2,
+	ACF_GLOBAL = (1<<1),
+
+	ACF_NONTEMP = (1<<2),
 };
 
 /* up to four chunks, to handle coalescing for registers/components better */
@@ -285,6 +293,9 @@ struct affinity_chunk
 	unsigned pin_reg;
 	/* chan+1 if some var is pinned to chan */
 	unsigned pin_chan;
+
+
+	int pvps_chan;
 };
 
 
@@ -324,6 +335,8 @@ boolean vset_removevec(struct vset * s, struct vvec * from);
 void vset_clear(struct vset * s);
 void vset_copy(struct vset * s, struct vset * from);
 struct vset * vset_createcopy(struct vset * from);
+void vset_diff2(struct vset *s1, struct vset *s2, struct vset *r1, struct vset *r2);
+void vset_diff(struct vset *s1, struct vset *s2, struct vset *r1);
 
 struct vmap* vmap_create(unsigned initial_size);
 void vmap_destroy(struct vmap * s);

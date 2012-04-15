@@ -51,7 +51,7 @@ int is_alu_kill_inst(struct r600_bytecode * bc, struct r600_bytecode_alu *alu)
 }
 
 // instructions with single output replicated in all channels (r600_is_alu_reduction_inst except CUBE)
-static int is_alu_replicate_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
+int is_alu_replicate_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu)
 {
 	switch (bc->chip_class) {
 	case R600:
@@ -77,6 +77,7 @@ static int is_alu_four_slots_inst(struct r600_bytecode *bc, struct r600_bytecode
 					(alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_INTERP_XY ||
 					alu->inst == EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_INTERP_ZW));
 }
+
 
 static struct var_desc * create_var(struct shader_info * info)
 {
@@ -2098,6 +2099,10 @@ static void set_alu_regs(struct shader_info * info, struct ast_node * node)
 				 * but probably it is if it doesn't lock up the gpu */
 				node->alu->src[q].sel = V_SQ_ALU_SRC_0;
 				node->alu->src[q].chan = 0;
+			} else if (v->flags & VF_PVPS) {
+				int chan = v->pvps_chan;
+				node->alu->src[q].sel = chan<4 ? V_SQ_ALU_SRC_PV : V_SQ_ALU_SRC_PS;
+				node->alu->src[q].chan = chan < 4 ? chan : 0;
 			} else {
 				unsigned rc = get_var_alloc(info, v);
 				assert(rc);
@@ -2111,9 +2116,16 @@ static void set_alu_regs(struct shader_info * info, struct ast_node * node)
 	if (v && !(v->flags & VF_DEAD)) {
 		unsigned rc = get_var_alloc(info, v);
 		assert(rc);
-		node->alu->dst.sel = KEY_REG(rc);
+
 		node->alu->dst.chan = KEY_CHAN(rc);
-		node->alu->dst.write = 1;
+
+		if (v->flags & VF_PVPS) {
+			node->alu->dst.sel = 0;
+			node->alu->dst.write = 0;
+		} else {
+			node->alu->dst.sel = KEY_REG(rc);
+			node->alu->dst.write = 1;
+		}
 	} else {
 		node->alu->dst.write = 0;
 		node->alu->dst.sel = 0;

@@ -573,6 +573,8 @@ struct scheduler_ctx {
 	int alu_slot_count;
 	int group_inst_count;
 
+	boolean contains_kill;
+
 	/* pending instructions list - map of indices to instruction nodes, to keep them ordered */
 	struct vmap * instructions;
 
@@ -580,6 +582,9 @@ struct scheduler_ctx {
 	struct vmap * ready_inst;
 
 	struct vset * live;
+	struct vset * chunks_live;
+	struct vset * prev_vars_born;
+	struct vset * prev_chunks_born;
 	struct vmap * use_count;
 	struct vmap * reg_map;
 	struct vmap * reg_map_save;
@@ -1258,7 +1263,9 @@ static boolean sched_check_clause_limits(struct scheduler_ctx * ctx)
 	boolean split = false;
 	int literal_slot_count = ctx->nliteral ? ((ctx->nliteral+1)>>1) : 0;
 
-	if (!sched_alloc_kcache(ctx))
+
+
+	if (ctx->contains_kill || !sched_alloc_kcache(ctx))
 		split = true;
 	else {
 		ctx->alu_slot_count += ctx->group_inst_count + literal_slot_count;
@@ -1291,12 +1298,61 @@ static void sched_count_instructions(struct scheduler_ctx * ctx)
 	}
 }
 
-static void sched_process_selected_group(struct scheduler_ctx * ctx)
+
+static void sched_get_chunk_set(struct vset * vars, struct vset * chunks)
 {
-	int j, max_slots = ctx->info->max_slots;
+	int q;
+
+	vset_clear(chunks);
+
+	for (q=0; q<vars->count; q++) {
+		struct var_desc * v = vars->keys[q];
+		if (v && v->chunk)
+			vset_add(chunks, v->chunk);
+	}
+}
+
+/*
+static void dump_chunk_set(struct vset * s) {
+	int j;
+	for (j = 0; j<s->count; j++)
+		dump_chunk(s->keys[j]);
+}
+*/
+
+static void sched_update_live_set(struct vset * live, struct ast_node * node,
+		struct vset * died, struct vset * born)
+{
+	int q;
+
+	for (q=0; q<node->outs->count; q++) {
+		struct var_desc * v = node->outs->keys[q];
+		if (v && vset_remove(live, v))
+			if (died)
+				vset_add(died, v);
+	}
+
+	for (q=0; q<node->ins->count; q++) {
+		struct var_desc * v = node->ins->keys[q];
+		if (v && vset_add(live, v))
+			if (born)
+				vset_add(born, v);
+	}
+}
+
+static void sched_process_selected_group(struct scheduler_ctx * ctx, boolean split)
+{
+	int j, q, max_slots = ctx->info->max_slots;
 	struct ast_node * c;
 
+	struct vset *chunks_before = vset_createcopy(ctx->chunks_live);
+	struct vset *chunks_born = vset_create(16, 0);
+	struct vset *vars_born = vset_create(16, 0);
+
 	R600_DUMP( "##### group selected:\n");
+
+	/* FIXME: after recent rework probably there is no need to
+	 * handle 4-slot group separately */
 
 	/* process 4-slot instruction (if any) */
 	if (ctx->slots[ctx->curgroup][0] && (ctx->slots[ctx->curgroup][0]->flags & AF_FOUR_SLOTS_INST)) {
@@ -1306,10 +1362,12 @@ static void sched_process_selected_group(struct scheduler_ctx * ctx)
 		/* decrement use count for all ins */
 		update_counts(ctx->use_count, g->ins, -1);
 
+		sched_update_live_set(ctx->live, g, NULL, vars_born);
+
 		/* outs are dead now */
-		vset_removevec(ctx->live, g->outs);
+//		vset_removevec(ctx->live, g->outs);
 		/* ins are live now */
-		vset_addvec(ctx->live, g->ins);
+//		vset_addvec(ctx->live, g->ins);
 	}
 
 	/* process 1-slot instructions */
@@ -1326,14 +1384,77 @@ static void sched_process_selected_group(struct scheduler_ctx * ctx)
 			if (!(c->flags & AF_FOUR_SLOTS_INST)) {
 				update_counts(ctx->use_count, c->ins, -1);
 
-				vset_removevec(ctx->live, c->outs);
-				vset_addvec(ctx->live, c->ins);
+//				vset_removevec(ctx->live, c->outs);
+//				vset_addvec(ctx->live, c->ins);
+
+				sched_update_live_set(ctx->live, c, NULL, vars_born);
 
 				c->parent->child = NULL;
 				c->parent = NULL;
 			}
 		}
 	}
+
+	sched_get_chunk_set(ctx->live, ctx->chunks_live);
+	vset_diff(ctx->chunks_live, chunks_before, chunks_born);
+
+	if (!split) {
+
+		for (j=0; j<max_slots; j++) {
+			c = ctx->slots[ctx->curgroup][j];
+			if (c && !c->alu->is_op3)	{
+				struct var_desc * v = c->outs->keys[0];
+
+				if (!v)
+					continue;
+
+				if (v->chunk) {
+					if (!vset_contains(ctx->chunks_live, v->chunk) &&
+							vset_contains(ctx->prev_chunks_born, v->chunk)) {
+						int sel = is_alu_replicate_inst(&ctx->info->shader->bc, c->alu) ? 0 : j;
+
+						for (q=0; q<v->chunk->vars->count; q++) {
+							struct var_desc * v2 = v->chunk->vars->keys[q];
+
+							v2->flags |= VF_PVPS;
+							v2->pvps_chan = sel;
+
+							R600_DUMP("marked as pvps (%d) : ",v->pvps_chan);
+							print_var(v);
+							R600_DUMP(" @ ");
+							print_reg(v->color);
+							R600_DUMP("\n");
+						}
+					}
+
+				} else if (vset_contains(ctx->prev_vars_born, v)) {
+
+					/* disable write, value will be passed through pv/ps */
+
+					v->flags |= VF_PVPS;
+					v->pvps_chan = is_alu_reduction_inst(&ctx->info->shader->bc, c->alu) ? 0 : j;
+
+					R600_DUMP("marked as pvps (%d) : ",v->pvps_chan);
+					print_var(v);
+					R600_DUMP(" @ ");
+					print_reg(v->color);
+					R600_DUMP("\n");
+				}
+			}
+		}
+
+		vset_copy(ctx->prev_vars_born, vars_born);
+		vset_copy(ctx->prev_chunks_born, chunks_born);
+
+	} else {
+		vset_clear(ctx->prev_vars_born);
+		vset_clear(ctx->prev_chunks_born);
+	}
+
+	vset_destroy(chunks_before);
+	vset_destroy(chunks_born);
+	vset_destroy(vars_born);
+
 }
 
 /* check interferences
@@ -1532,14 +1653,12 @@ static void sched_mark_nontemp(struct vset * s)
 	}
 }
 
-
 /* schedule alu clause */
 /* probably could be described as a bottom-up greedy cycle scheduler */
 static boolean post_schedule_alu(struct shader_info *info, struct ast_node * clause_node)
 {
 	struct scheduler_ctx ctx;
 	int i = 0, j, max_slots = info->max_slots;
-	boolean contains_kill = false;
 	struct ast_node * c;
 	boolean result = true;
 
@@ -1558,6 +1677,11 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 	ctx.reg_map_save = vmap_create(16);
 	ctx.live = vset_createcopy(clause_node->vars_live_after);
 	ctx.clause_node = clause_node;
+	ctx.prev_vars_born = vset_create(16, 0);
+	ctx.prev_chunks_born = vset_create(16, 0);
+	ctx.chunks_live = vset_create(16, 0);
+
+	sched_get_chunk_set(ctx.live, ctx.chunks_live);
 
 	memset(ctx.slots, 0, 2*5*sizeof(void*));
 
@@ -1607,7 +1731,7 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 		} else {
 			memset(ctx.cbs.bs_slots, 0, 5*sizeof(void*));
 
-			contains_kill = false;
+			ctx.contains_kill = false;
 			ctx.free_slots = (1<<max_slots)-1;
 			memset(ctx.slots[ctx.curgroup], 0, 5*sizeof(void*));
 			memset(ctx.idx, 0, 5*sizeof(int));
@@ -1644,9 +1768,9 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 			/* don't mix kill instructions with other instructions in the same group */
 			/* FIXME: probably it's not required */
 			if (kill) {
-				if (!contains_kill && ctx.free_slots != (1<<max_slots)-1)
+				if (!ctx.contains_kill && ctx.free_slots != (1<<max_slots)-1)
 					continue;
-			} else if (contains_kill)
+			} else if (ctx.contains_kill)
 				continue;
 
 
@@ -1727,7 +1851,7 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 				ctx.slots[2][slot] = n;
 
 				if (kill)
-					contains_kill = true;
+					ctx.contains_kill = true;
 
 				/* remember index - we'll want to put instruction back to the same position in the
 				 * list of pending instructions if we'll discard it from current group */
@@ -1811,10 +1935,11 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 				dump_node(info, ctx.slots[ctx.curgroup][slot], 0);
 			}
 		}
-
 		sched_count_instructions(&ctx);
 
-		if (sched_check_clause_limits(&ctx)) {
+		boolean split = sched_check_clause_limits(&ctx);
+
+		if (split) {
 			int j;
 			struct ast_node * c;
 
@@ -1842,7 +1967,7 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 			}
 		}
 
-		sched_process_selected_group(&ctx);
+		sched_process_selected_group(&ctx, split);
 
 		R600_DUMP( " updating interferences :");
 		dump_vset(ctx.live);
@@ -1852,7 +1977,6 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 		sched_add_group(&ctx);
 
 		ctx.curgroup = !ctx.curgroup;
-
 	}
 
 	vmap_destroy(ctx.instructions);
@@ -1864,6 +1988,8 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 
 	vset_destroy(ctx.globals);
 	vset_destroy(ctx.locals);
+	vset_destroy(ctx.prev_vars_born);
+	vset_destroy(ctx.prev_chunks_born);
 
 	destroy_ast(clause_node->child);
 

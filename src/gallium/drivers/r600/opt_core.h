@@ -270,6 +270,7 @@ struct shader_info
 
 
 int is_alu_kill_inst(struct r600_bytecode * bc, struct r600_bytecode_alu *alu);
+int is_alu_replicate_inst(struct r600_bytecode *bc, struct r600_bytecode_alu *alu);
 boolean post_schedule(struct shader_info *info);
 struct ast_node * create_node(enum node_type type);
 void destroy_ast(struct ast_node * n);
@@ -277,6 +278,7 @@ void gs_schedule(struct shader_info * info);
 
 
 int r600_shader_optimize(struct r600_context * rctx, struct r600_pipe_shader *pipeshader, int dump);
+
 
 
 
