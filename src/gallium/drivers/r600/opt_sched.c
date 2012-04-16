@@ -366,7 +366,7 @@ static unsigned gs_calc_min_prio(struct shader_info * info, struct ast_node * no
 			do {
 				void * d = 0;
 
-				if (VMAP_GET(info->fetch_levels, lvl, &d) && ((unsigned)d)==16) {
+				if (VMAP_GET(info->fetch_levels, lvl, &d) && ((unsigned)d) >= info->max_fetch_group) {
 					lvl++;
 					pri += ANP_PRIO_BLOCKSTEP;
 					continue;
@@ -1345,9 +1345,15 @@ static void sched_process_selected_group(struct scheduler_ctx * ctx, boolean spl
 	int j, q, max_slots = ctx->info->max_slots;
 	struct ast_node * c;
 
-	struct vset *chunks_before = vset_createcopy(ctx->chunks_live);
-	struct vset *chunks_born = vset_create(16, 0);
-	struct vset *vars_born = vset_create(16, 0);
+	struct vset *chunks_before = NULL;
+	struct vset *chunks_born = NULL;
+	struct vset *vars_born = NULL;
+
+	if (!ctx->info->disable_mask_writes) {
+		chunks_before = vset_createcopy(ctx->chunks_live);
+		chunks_born = vset_create(16, 0);
+		vars_born = vset_create(16, 0);
+	}
 
 	R600_DUMP( "##### group selected:\n");
 
@@ -1395,66 +1401,69 @@ static void sched_process_selected_group(struct scheduler_ctx * ctx, boolean spl
 		}
 	}
 
-	sched_get_chunk_set(ctx->live, ctx->chunks_live);
-	vset_diff(ctx->chunks_live, chunks_before, chunks_born);
 
-	if (!split) {
+	if (!ctx->info->disable_mask_writes) {
 
-		for (j=0; j<max_slots; j++) {
-			c = ctx->slots[ctx->curgroup][j];
-			if (c && !c->alu->is_op3)	{
-				struct var_desc * v = c->outs->keys[0];
+		sched_get_chunk_set(ctx->live, ctx->chunks_live);
+		vset_diff(ctx->chunks_live, chunks_before, chunks_born);
 
-				if (!v)
-					continue;
+		if (!split) {
 
-				if (v->chunk) {
-					if (!vset_contains(ctx->chunks_live, v->chunk) &&
-							vset_contains(ctx->prev_chunks_born, v->chunk)) {
-						int sel = is_alu_replicate_inst(&ctx->info->shader->bc, c->alu) ? 0 : j;
+			for (j=0; j<max_slots; j++) {
+				c = ctx->slots[ctx->curgroup][j];
+				if (c && !c->alu->is_op3)	{
+					struct var_desc * v = c->outs->keys[0];
 
-						for (q=0; q<v->chunk->vars->count; q++) {
-							struct var_desc * v2 = v->chunk->vars->keys[q];
+					if (!v)
+						continue;
 
-							v2->flags |= VF_PVPS;
-							v2->pvps_chan = sel;
+					if (v->chunk) {
+						if (!vset_contains(ctx->chunks_live, v->chunk) &&
+								vset_contains(ctx->prev_chunks_born, v->chunk)) {
+							int sel = is_alu_replicate_inst(&ctx->info->shader->bc, c->alu) ? 0 : j;
 
-							R600_DUMP("marked as pvps (%d) : ",v->pvps_chan);
-							print_var(v);
-							R600_DUMP(" @ ");
-							print_reg(v->color);
-							R600_DUMP("\n");
+							for (q=0; q<v->chunk->vars->count; q++) {
+								struct var_desc * v2 = v->chunk->vars->keys[q];
+
+								v2->flags |= VF_PVPS;
+								v2->pvps_chan = sel;
+
+								R600_DUMP("marked as pvps (%d) : ",v->pvps_chan);
+								print_var(v);
+								R600_DUMP(" @ ");
+								print_reg(v->color);
+								R600_DUMP("\n");
+							}
 						}
+
+					} else if (vset_contains(ctx->prev_vars_born, v)) {
+
+						/* disable write, value will be passed through pv/ps */
+
+						v->flags |= VF_PVPS;
+						v->pvps_chan = is_alu_reduction_inst(&ctx->info->shader->bc, c->alu) ? 0 : j;
+
+						R600_DUMP("marked as pvps (%d) : ",v->pvps_chan);
+						print_var(v);
+						R600_DUMP(" @ ");
+						print_reg(v->color);
+						R600_DUMP("\n");
 					}
-
-				} else if (vset_contains(ctx->prev_vars_born, v)) {
-
-					/* disable write, value will be passed through pv/ps */
-
-					v->flags |= VF_PVPS;
-					v->pvps_chan = is_alu_reduction_inst(&ctx->info->shader->bc, c->alu) ? 0 : j;
-
-					R600_DUMP("marked as pvps (%d) : ",v->pvps_chan);
-					print_var(v);
-					R600_DUMP(" @ ");
-					print_reg(v->color);
-					R600_DUMP("\n");
 				}
 			}
+
+			vset_copy(ctx->prev_vars_born, vars_born);
+			vset_copy(ctx->prev_chunks_born, chunks_born);
+
+		} else {
+			vset_clear(ctx->prev_vars_born);
+			vset_clear(ctx->prev_chunks_born);
 		}
 
-		vset_copy(ctx->prev_vars_born, vars_born);
-		vset_copy(ctx->prev_chunks_born, chunks_born);
-
-	} else {
-		vset_clear(ctx->prev_vars_born);
-		vset_clear(ctx->prev_chunks_born);
+		vset_destroy(chunks_before);
+		vset_destroy(chunks_born);
+		vset_destroy(vars_born);
 	}
-
-	vset_destroy(chunks_before);
-	vset_destroy(chunks_born);
-	vset_destroy(vars_born);
-
 }
 
 /* check interferences
@@ -1690,7 +1699,8 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 	sched_select_live_instructions(&ctx);
 	sched_check_chunks_types(clause_node->vars_defined, ctx.globals);
 
-	sched_mark_nontemp(ctx.globals);
+	if (!info->disable_temp_gprs)
+		sched_mark_nontemp(ctx.globals);
 
 	ctx.count = ctx.instructions->count;
 
@@ -1939,7 +1949,7 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 
 		boolean split = sched_check_clause_limits(&ctx);
 
-		if (split) {
+		if (split && !info->disable_temp_gprs) {
 			int j;
 			struct ast_node * c;
 

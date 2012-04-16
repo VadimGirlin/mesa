@@ -231,7 +231,10 @@ struct shader_info
 	int last_color;
 	boolean enable_last_color_update;
 
-	int temp_gprs;
+	int		temp_gprs;
+	boolean	disable_temp_gprs;
+	boolean	disable_mask_writes;
+	int		max_fetch_group;
 
 	struct vmap * vars;
 
@@ -245,13 +248,6 @@ struct shader_info
 	struct vque * edge_queue;
 	struct vque * chunk_queue;
 	struct vque * chunk_groups;
-
-
-	/* used for dot graph building, to compare real dependencies with expected */
-	struct vmap * rdefs;
-	struct vmap * edefs;
-	struct vmap * p_rdefs;
-	struct vmap * p_edefs;
 
 	int stack_level;
 

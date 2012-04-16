@@ -1318,7 +1318,7 @@ boolean recolor_local(struct shader_info * info, struct var_desc * v)
 	first_temp = (128-info->temp_gprs)*4 + 1;
 	color_step = 4;
 
-	if (v->flags & VF_NONTEMP) {
+	if (info->disable_temp_gprs || (v->flags & VF_NONTEMP)) {
 		color = 1 + color_chan;
 		temps_processed = true;
 	} else {

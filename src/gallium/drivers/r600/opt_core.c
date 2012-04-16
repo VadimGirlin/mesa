@@ -3132,11 +3132,19 @@ int r600_shader_optimize(struct r600_context * rctx, struct r600_pipe_shader *pi
 	int r = 0;
 	struct shader_info info = {};
 
-	if (dump_global_stats == -1)
+	static int max_fetch_group = -1;
+	static boolean disable_mask_write = false;
+	static boolean disable_temp_gprs = false;
+
+	if (shaders_opt == -1) {
+		shaders_opt = debug_get_bool_option("R600_SHADERS_OPT", true);
 		dump_global_stats = debug_get_bool_option("R600_OPT_DUMP_STATS", false);
 
-	if (shaders_opt == -1)
-		shaders_opt = debug_get_bool_option("R600_SHADERS_OPT", true);
+		max_fetch_group = debug_get_num_option("R600_OPT_MAX_FETCH", 16);
+
+		disable_mask_write = !debug_get_bool_option("R600_OPT_MASK_WRITE", true);
+		disable_temp_gprs = !debug_get_bool_option("R600_OPT_TEMP_GPRS", true);
+	}
 
 	// only EVERGREEN is supported currently
 	if (rctx->chip_class != EVERGREEN) {
@@ -3175,6 +3183,10 @@ int r600_shader_optimize(struct r600_context * rctx, struct r600_pipe_shader *pi
 	info.rctx = rctx;
 
 	info.temp_gprs = 4;
+	info.max_fetch_group = max_fetch_group;
+	info.disable_temp_gprs = disable_temp_gprs;
+	info.disable_mask_writes = disable_mask_write;
+
 	info.next_temp = 1;
 	info.dump = dump;
 
