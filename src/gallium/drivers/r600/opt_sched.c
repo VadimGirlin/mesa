@@ -2000,6 +2000,7 @@ static boolean post_schedule_alu(struct shader_info *info, struct ast_node * cla
 	vset_destroy(ctx.locals);
 	vset_destroy(ctx.prev_vars_born);
 	vset_destroy(ctx.prev_chunks_born);
+	vset_destroy(ctx.chunks_live);
 
 	destroy_ast(clause_node->child);
 

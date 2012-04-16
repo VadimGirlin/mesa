@@ -82,7 +82,7 @@ enum ast_flags
 	AF_KEEP_ALIVE = (1<<10),
 
 	/* for generated alu instructions (copy insertion), need to delete them later */
-	AF_ALU_DELETE = (1<<12),
+	AF_DELETE_BC = (1<<12),
 
 	/* alu clause split (due to instruction count limit, kcache lines limit, ... */
 	/* set on the last group of the clause */

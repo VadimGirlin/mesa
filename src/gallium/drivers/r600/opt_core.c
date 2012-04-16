@@ -140,7 +140,7 @@ static struct ast_node * create_alu_copy(struct shader_info * info, struct var_d
 	struct ast_node * n = create_node(NT_OP);
 	n->subtype = NST_COPY;
 
-	n->flags |= AF_COPY_HINT | AF_SPLIT_COPY | AF_ALU_DELETE;
+	n->flags |= AF_COPY_HINT | AF_SPLIT_COPY | AF_DELETE_BC;
 
 	n->alu_allowed_slots_type = AT_ANY;
 
@@ -2067,8 +2067,12 @@ void destroy_ast(struct ast_node * n)
 	if (!n)
 		return;
 
-	if (n->flags & AF_ALU_DELETE)
-		free(n->alu);
+	if (n->flags & AF_DELETE_BC) {
+		if (n->alu)
+			free(n->alu);
+		if (n->cf)
+			free(n->cf);
+	}
 
 	destroy_ast(n->rest);
 	destroy_ast(n->child);
