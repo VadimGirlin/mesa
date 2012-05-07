@@ -916,9 +916,6 @@ let Predicates = [isCayman] in {
 
 let Gen = AMDGPUGen.CAYMAN in {
 
-  /* XXX: I'm not sure if this opcode is correct. */
-  def RECIP_UINT_cm : RECIP_UINT_Common<0x77>;
-
 } // End AMDGPUGen.CAYMAN
 
 } // End isCayman

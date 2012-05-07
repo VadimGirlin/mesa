@@ -130,6 +130,7 @@ unsigned R600InstrInfo::getRECIP_UINT() const
   } else if (dev->getDeviceFlag() != OCL_DEVICE_CAYMAN) {
     return AMDIL::RECIP_UINT_eg;
   } else {
-    return AMDIL::RECIP_UINT_cm;
+    assert(!"no RECIP_UINT on cayman");
+    return 0;
   }
 }
