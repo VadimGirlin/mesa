@@ -26,6 +26,9 @@ void AMDGPULowerShaderInstructionsPass::preloadRegister(MachineFunction * MF,
   if (!MRI->isLiveIn(physReg)) {
     MRI->addLiveIn(physReg, virtReg);
     MachineBasicBlock &EntryMBB = MF->front();
+
+    // XXX use EmitLiveInCopies instead?
+    EntryMBB.addLiveIn(physReg);
     BuildMI(MF->front(), EntryMBB.begin(), DebugLoc(), TII->get(TargetOpcode::COPY),
             virtReg)
             .addReg(physReg);
