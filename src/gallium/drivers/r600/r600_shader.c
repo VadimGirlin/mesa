@@ -801,6 +801,12 @@ static int tgsi_declaration(struct r600_shader_ctx *ctx)
 				ctx->cv_output = i;
 				break;
 			}
+		} else if (ctx->type == TGSI_PROCESSOR_FRAGMENT) {
+			switch (d->Semantic.Name) {
+			case TGSI_SEMANTIC_COLOR:
+				ctx->shader->nr_ps_max_color_exports++;
+				break;
+			}
 		}
 		break;
 	case TGSI_FILE_CONSTANT:
@@ -1153,8 +1159,10 @@ static int r600_shader_from_tgsi(struct r600_context * rctx, struct r600_pipe_sh
 	ctx.colors_used = 0;
 	ctx.clip_vertex_write = 0;
 
+	shader->nr_ps_color_exports = 0;
+	shader->nr_ps_max_color_exports = 0;
+
 	shader->two_side = (ctx.type == TGSI_PROCESSOR_FRAGMENT) && rctx->two_side;
-	shader->nr_cbufs = rctx->nr_cbufs;
 
 	/* register allocations */
 	/* Values [0,127] correspond to GPR[0..127].
@@ -1288,6 +1296,9 @@ static int r600_shader_from_tgsi(struct r600_context * rctx, struct r600_pipe_sh
 			goto out_err;
 		}
 	}
+
+	if (shader->fs_write_all && rctx->chip_class >= EVERGREEN)
+		shader->nr_ps_max_color_exports = 8;
 
 	if (ctx.fragcoord_input >= 0) {
 		if (ctx.bc->chip_class == CAYMAN) {
@@ -1528,10 +1539,17 @@ static int r600_shader_from_tgsi(struct r600_context * rctx, struct r600_pipe_sh
 			break;
 		case TGSI_PROCESSOR_FRAGMENT:
 			if (shader->output[i].name == TGSI_SEMANTIC_COLOR) {
+				/* never export more colors than the number of CBs */
+				if (next_pixel_base && next_pixel_base >= rctx->nr_cbufs) {
+					/* skip export */
+					j--;
+					continue;
+				}
 				output[j].array_base = next_pixel_base++;
 				output[j].type = V_SQ_CF_ALLOC_EXPORT_WORD0_SQ_EXPORT_PIXEL;
+				shader->nr_ps_color_exports++;
 				if (shader->fs_write_all && (rctx->chip_class >= EVERGREEN)) {
-					for (k = 1; k < shader->nr_cbufs; k++) {
+					for (k = 1; k < rctx->nr_cbufs; k++) {
 						j++;
 						memset(&output[j], 0, sizeof(struct r600_bytecode_output));
 						output[j].gpr = shader->output[i].gpr;
@@ -1545,6 +1563,7 @@ static int r600_shader_from_tgsi(struct r600_context * rctx, struct r600_pipe_sh
 						output[j].array_base = next_pixel_base++;
 						output[j].inst = BC_INST(ctx.bc, V_SQ_CF_ALLOC_EXPORT_WORD1_SQ_CF_INST_EXPORT);
 						output[j].type = V_SQ_CF_ALLOC_EXPORT_WORD0_SQ_EXPORT_PIXEL;
+						shader->nr_ps_color_exports++;
 					}
 				}
 			} else if (shader->output[i].name == TGSI_SEMANTIC_POSITION) {

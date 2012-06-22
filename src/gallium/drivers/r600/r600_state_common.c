@@ -690,8 +690,8 @@ static void r600_update_derived_state(struct r600_context *rctx)
 	}
 
 	if ((rctx->ps_shader->shader.two_side != rctx->two_side) ||
-	    ((rctx->chip_class >= EVERGREEN) && rctx->ps_shader->shader.fs_write_all &&
-	     (rctx->ps_shader->shader.nr_cbufs != rctx->nr_cbufs))) {
+	     (MIN2(rctx->ps_shader->shader.nr_ps_max_color_exports, rctx->nr_cbufs)
+	    		 != rctx->ps_shader->shader.nr_ps_color_exports)) {
 		r600_shader_rebuild(&rctx->context, rctx->ps_shader);
 	}
 
