@@ -1849,12 +1849,12 @@ void evergreen_init_state_functions(struct r600_context *rctx)
 
 	rctx->context.create_blend_state = evergreen_create_blend_state;
 	rctx->context.create_depth_stencil_alpha_state = evergreen_create_dsa_state;
-	rctx->context.create_fs_state = r600_create_shader_state;
+	rctx->context.create_fs_state = r600_create_shader_state_ps;
 	rctx->context.create_rasterizer_state = evergreen_create_rs_state;
 	rctx->context.create_sampler_state = evergreen_create_sampler_state;
 	rctx->context.create_sampler_view = evergreen_create_sampler_view;
 	rctx->context.create_vertex_elements_state = r600_create_vertex_elements;
-	rctx->context.create_vs_state = r600_create_shader_state;
+	rctx->context.create_vs_state = r600_create_shader_state_vs;
 	rctx->context.bind_blend_state = r600_bind_blend_state;
 	rctx->context.bind_depth_stencil_alpha_state = r600_bind_dsa_state;
 	rctx->context.bind_fragment_sampler_states = evergreen_bind_ps_sampler;
@@ -2813,12 +2813,12 @@ void *evergreen_create_db_flush_dsa(struct r600_context *rctx)
 void evergreen_update_dual_export_state(struct r600_context * rctx)
 {
 	unsigned dual_export = rctx->export_16bpc && rctx->nr_cbufs &&
-			!rctx->ps_shader->ps_depth_export;
+			!rctx->ps_shader->current->ps_depth_export;
 
 	unsigned db_source_format = dual_export ? V_02880C_EXPORT_DB_TWO :
 			V_02880C_EXPORT_DB_FULL;
 
-	unsigned db_shader_control = rctx->ps_shader->db_shader_control |
+	unsigned db_shader_control = rctx->ps_shader->current->db_shader_control |
 			S_02880C_DUAL_EXPORT_ENABLE(dual_export) |
 			S_02880C_DB_SOURCE_FORMAT(db_source_format);
 
