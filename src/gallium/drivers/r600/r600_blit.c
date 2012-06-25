@@ -114,13 +114,15 @@ static unsigned u_num_layers(struct pipe_resource *r, unsigned level)
 	}
 }
 
-void r600_blit_uncompress_depth(struct pipe_context *ctx, struct r600_resource_texture *texture)
+void r600_blit_uncompress_depth(struct pipe_context *ctx,
+		struct r600_resource_texture *texture,
+		unsigned staging)
 {
 	struct r600_context *rctx = (struct r600_context *)ctx;
 	unsigned layer, level;
 	float depth = 1.0f;
 
-	if (!texture->dirty_db)
+	if (!texture->dirty_db[staging])
 		return;
 
 	if (rctx->family == CHIP_RV610 || rctx->family == CHIP_RV630 ||
@@ -141,10 +143,10 @@ void r600_blit_uncompress_depth(struct pipe_context *ctx, struct r600_resource_t
 
 			zsurf = ctx->create_surface(ctx, &texture->resource.b.b, &surf_tmpl);
 
-			surf_tmpl.format = texture->flushed_depth_texture->real_format;
+			surf_tmpl.format = texture->flushed_depth_texture[staging]->real_format;
 			surf_tmpl.usage = PIPE_BIND_RENDER_TARGET;
 			cbsurf = ctx->create_surface(ctx,
-					(struct pipe_resource*)texture->flushed_depth_texture, &surf_tmpl);
+					(struct pipe_resource*)texture->flushed_depth_texture[staging], &surf_tmpl);
 
 			r600_blitter_begin(ctx, R600_DECOMPRESS);
 			util_blitter_custom_depth_stencil(rctx->blitter, zsurf, cbsurf, rctx->custom_dsa_flush, depth);
@@ -155,7 +157,7 @@ void r600_blit_uncompress_depth(struct pipe_context *ctx, struct r600_resource_t
 		}
 	}
 
-	texture->dirty_db = FALSE;
+	texture->dirty_db[staging] = FALSE;
 }
 
 void r600_flush_depth_textures(struct r600_context *rctx)
@@ -178,7 +180,7 @@ void r600_flush_depth_textures(struct r600_context *rctx)
 		if (tex->is_flushing_texture)
 			continue;
 
-		r600_blit_uncompress_depth(&rctx->context, tex);
+		r600_blit_uncompress_depth(&rctx->context, tex, 0);
 	}
 
 	/* also check CB here */
@@ -192,7 +194,7 @@ void r600_flush_depth_textures(struct r600_context *rctx)
 		if (tex->is_flushing_texture)
 			continue;
 
-		r600_blit_uncompress_depth(&rctx->context, tex);
+		r600_blit_uncompress_depth(&rctx->context, tex, 0);
 	}
 }
 
@@ -342,7 +344,7 @@ static void r600_resource_copy_region(struct pipe_context *ctx,
 	}
 
 	if (rsrc->is_depth && !rsrc->is_flushing_texture)
-		r600_texture_depth_flush(ctx, src, FALSE);
+		r600_texture_depth_flush(ctx, src, FALSE, 0);
 
 	restore_orig[0] = restore_orig[1] = FALSE;
 
@@ -397,6 +399,6 @@ void r600_blit_push_depth(struct pipe_context *ctx, struct r600_resource_texture
 
 	r600_hw_copy_region(ctx, (struct pipe_resource *)texture, 0,
 			    0, 0, 0,
-			    (struct pipe_resource *)texture->flushed_depth_texture, 0,
+			    (struct pipe_resource *)texture->flushed_depth_texture[1], 0,
 			    &sbox);
 }

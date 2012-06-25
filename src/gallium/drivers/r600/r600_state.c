@@ -1000,8 +1000,8 @@ static struct pipe_sampler_view *r600_create_sampler_view(struct pipe_context *c
 	}
 
 	if (tmp->is_depth && !tmp->is_flushing_texture) {
-	        r600_texture_depth_flush(ctx, texture, TRUE);
-		tmp = tmp->flushed_depth_texture;
+	        r600_texture_depth_flush(ctx, texture, TRUE, 0);
+		tmp = tmp->flushed_depth_texture[0];
 	}
 
 	endian = r600_colorformat_endian_swap(format);
@@ -1387,7 +1387,7 @@ static void r600_cb(struct r600_context *rctx, struct r600_pipe_state *rstate,
 		rctx->have_depth_fb = TRUE;
 
 	if (rtex->is_depth && !rtex->is_flushing_texture) {
-		rtex = rtex->flushed_depth_texture;
+		rtex = rtex->flushed_depth_texture[0];
 	}
 
 	/* XXX quite sure for dx10+ hw don't need any offset hacks */

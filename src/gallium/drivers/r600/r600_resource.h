@@ -58,9 +58,9 @@ struct r600_resource_texture {
 	unsigned			size;
 	unsigned			tile_type;
 	bool				is_depth;
-	unsigned			dirty_db;
+	unsigned			dirty_db[2];
 	struct r600_resource_texture    *stencil; /* Stencil is in a separate buffer on Evergreen. */
-	struct r600_resource_texture	*flushed_depth_texture;
+	struct r600_resource_texture	*flushed_depth_texture[2];
 	boolean				is_flushing_texture;
 	struct radeon_surface		surface;
 };
@@ -87,7 +87,9 @@ static INLINE struct r600_resource *r600_resource(struct pipe_resource *r)
 	return (struct r600_resource*)r;
 }
 
-int r600_texture_depth_flush(struct pipe_context *ctx, struct pipe_resource *texture, boolean just_create);
+int r600_texture_depth_flush(struct pipe_context *ctx,
+		struct pipe_resource *texture, boolean just_create,
+		unsigned staging);
 
 /* r600_texture.c texture transfer functions. */
 struct pipe_transfer* r600_texture_get_transfer(struct pipe_context *ctx,
