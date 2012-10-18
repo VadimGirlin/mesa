@@ -870,6 +870,7 @@ static int convert_cf(struct shader_info * info, struct ast_node * root)
 
 		switch (root->cf->inst) {
 		case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_START_NO_AL:
+		case EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_START_DX10:
 			convert_cf_loop(info, root);
 			convert_cf(info, root->child);
 			break;
@@ -2525,7 +2526,7 @@ static void build_shader_node(struct shader_info * info, struct ast_node * node)
 	if (node->subtype == NST_LOOP_REGION) {
 		struct r600_bytecode_cf * cfl_start, * cfl_end;
 
-		r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_START_NO_AL);
+		r600_bytecode_add_cfinst(info->bc, EG_V_SQ_CF_WORD1_SQ_CF_INST_LOOP_START_DX10);
 		cfl_start = info->bc->cf_last;
 
 		push_stack(info);
