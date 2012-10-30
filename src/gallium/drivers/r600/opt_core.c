@@ -2612,7 +2612,8 @@ static int build_shader(struct shader_info * info)
 	int r;
 
 	info->bc = calloc(1, sizeof(struct r600_bytecode));
-	r600_bytecode_init(info->bc, info->rctx->chip_class, info->rctx->family);
+	r600_bytecode_init(info->bc, info->rctx->chip_class, info->rctx->family,
+			info->rctx->screen->msaa_texture_support);
 	info->bc->type = info->shader->processor_type;
 
 	info->bc->opt_build = 1;
