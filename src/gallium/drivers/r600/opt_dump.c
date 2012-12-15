@@ -38,7 +38,7 @@
 
 static char * chans = "xyzwt";
 
-#define R600_DISASM_ARGS_OFFSET 16
+#define R600_DISASM_ARGS_OFFSET 20
 
 int _r600_opt_dump_level = -1;
 
@@ -82,6 +82,7 @@ char * eg_alu_op2_inst_names[256] =
 		[EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_SETE]= "SETE",
 		[EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_ADD] = "ADD",
 		[EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MUL] = "MUL",
+		[EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MUL_IEEE] = "MUL_IEEE",
 		[EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_KILLGT] = "KILLGT",
 		[EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_MOV] = "MOV",
 		[EG_V_SQ_ALU_WORD1_OP2_SQ_OP2_INST_INTERP_XY] = "INTERP_XY",
@@ -575,6 +576,14 @@ void dump_alu(struct shader_info * info, int level, struct r600_bytecode_alu * a
 	char *pn;
 
 	R600_DUMP( "%c ", alu->last ? '*' : ' ');
+
+	fprintf(stderr, alu->update_pred ? "UP " : "   ");
+
+	switch (alu->pred_sel) {
+	case 2: fprintf(stderr, "0 "); break;
+	case 3: fprintf(stderr, "1 "); break;
+	default: fprintf(stderr, "  "); break;
+	}
 
 	if (alu->is_op3) {
 
@@ -1157,10 +1166,10 @@ void dump_bytecode(struct shader_info * info)
 			id++;
 
 			if (new_alu_group) {
-				fprintf(stderr, "\t\t%3d\t", ngroup);
+				fprintf(stderr, "\t\t%4d ", ngroup);
 				new_alu_group = 0;
 			} else {
-				fprintf(stderr, "\t\t\t");
+				fprintf(stderr, "\t\t     ");
 			}
 
 			dump_alu(info, level, alu);
